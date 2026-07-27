@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>رویدادهای روز — پالس ایران ۲۴</title>
+<script>
+(function(){
+  var t='light'; try{ t=localStorage.getItem('pi24-theme')||'light'; }catch(e){}
+  document.documentElement.setAttribute('data-theme', t);
+  window.addEventListener('message', function(e){
+    if(e.data && e.data.type==='pi24-theme'){ document.documentElement.setAttribute('data-theme', e.data.theme); }
+    if(e.data && e.data.type==='pi24-lang'){
+      var L = { fa:['رویدادهای روز','پالس ایران ۲۴'], en:["Today's Events",'Pulse Iran 24'], de:['Ereignisse des Tages','Pulse Iran 24'] }[e.data.lang] || null;
+      if(L){
+        var b = document.querySelector('.head .badge');
+        if(b){ var d = b.querySelector('.dot'); b.textContent = L[0]; if(d){ b.insertBefore(d, b.firstChild); } }
+        var br = document.querySelector('.head .brand'); if(br) br.textContent = L[1];
+      }
+    }
+  });
+})();
+</script>
+<style>
+  :root{ --card:#111a2e; --a1:#22d3ee; --a2:#6366f1; --a3:#f43f5e; --headg:rgba(11,18,32,.85); --locbg:rgba(11,18,32,.85); --loctx:#fff; --dotbg:rgba(255,255,255,.28); }
+  html[data-theme="light"]{ --card:#FFFFFF; --a1:#0891b2; --headg:rgba(255,255,255,.9); --locbg:rgba(255,255,255,.92); --loctx:#1B2430; --dotbg:rgba(0,0,0,.18); }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:transparent;font-family:'Vazirmatn',Tahoma,'Segoe UI',system-ui,sans-serif}
+  .gallery{position:relative;width:100%;max-width:440px;margin:0 auto;aspect-ratio:9/12;border-radius:22px;overflow:hidden;background:var(--card);box-shadow:0 18px 50px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06)}
+  .head{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;gap:9px;padding:14px 16px;background:linear-gradient(180deg, var(--headg), transparent)}
+  .head .badge{display:flex;align-items:center;gap:7px;background:linear-gradient(90deg,var(--a3),var(--a2));color:#fff;font-weight:800;font-size:13px;padding:6px 12px;border-radius:999px;letter-spacing:.4px}
+  .head .badge .dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1.2s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .head .brand{margin-inline-start:auto;color:var(--a1);font-weight:800;font-size:13px;letter-spacing:.5px}
+  .slides{position:absolute;inset:0}
+  .slide{position:absolute;inset:0;opacity:0;transition:opacity .8s ease;display:grid;place-items:center;overflow:hidden}
+  .slide.active{opacity:1}
+  .slide img{width:100%;height:100%;object-fit:cover;display:block}
+  .slide.active img{animation:kenburns 7s ease-out forwards}
+  @keyframes kenburns{from{transform:scale(1.08)}to{transform:scale(1)}}
+  .demo{width:100%;height:100%;display:grid;place-items:center;color:#fff;text-align:center;padding:24px}
+  .demo .big{font-size:44px;margin-bottom:8px}
+  .demo .txt{font-size:14px;opacity:.85;line-height:1.8}
+  .loc{position:absolute;bottom:48px;left:16px;right:16px;z-index:5;display:flex;justify-content:center;align-items:center;text-align:center;background:var(--locbg);color:var(--loctx);font-weight:700;font-size:14px;padding:8px 14px;border-radius:12px;border:1px solid rgba(34,211,238,.4)}
+  .dots{position:absolute;bottom:16px;left:0;right:0;z-index:5;display:flex;justify-content:center;gap:7px;flex-wrap:wrap;padding:0 14px}
+  .dots i{width:26px;height:4px;border-radius:999px;background:var(--dotbg);display:block;overflow:hidden;position:relative}
+  .dots i.on::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--a1),var(--a2));transform-origin:right;animation:fill var(--dur,5s) linear forwards}
+  @keyframes fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @media (prefers-reduced-motion:reduce){.slide.active img{animation:none}.head .badge .dot{animation:none}.dots i.on::after{animation:none;transform:scaleX(1)}}
+  html[data-theme="light"] .gallery{ box-shadow:0 14px 38px rgba(0,0,0,.14); border-color:rgba(0,0,0,.08); }
+</style>
+</head>
+<body>
+<div class="gallery" id="gallery" style="display:none">
+  <div class="head">
+    <span class="badge"><span class="dot"></span>رویدادهای روز</span>
+    <span class="brand">پالس ایران ۲۴</span>
+  </div>
+  <div class="slides" id="slides"></div>
+  <div class="loc" id="loc" style="display:none">
+    <span id="locText"></span>
+  </div>
+  <div class="dots" id="dots"></div>
+</div>
+<script>
+/* ============================================================
+   گالری رویدادهای روز — پالس ایران ۲۴
+
+   ۱) عکس‌ها:
+      عکس‌هایت را با اسم 1.jpg تا 16.jpg در پوشه assets/roz بگذار.
+      هر عکسی که وجود داشته باشد خودکار نشان داده می‌شود؛
+      اگر عکسی نباشد، بی‌سروصدا رد می‌شود. (حداکثر ۱۶ عکس)
+
+   ۲) اسم شهر (اختیاری):
+      برای هر عکس، بین دو گیومهٔ loc اسم شهر را بنویس. مثال:
+         { src:"assets/roz/1.jpg", loc:"تهران" },
+      اگر خالی بماند ("")، هیچ برچسبی زیر آن عکس نمی‌آید.
+
+   ۳) سرعت چرخش:
+      عدد IMAGE_SECONDS پایین‌تر را عوض کن (بر حسب ثانیه).
+   ============================================================ */
+const ITEMS = [
+  { src:"assets/roz/1.jpg",  loc:"" },
+  { src:"assets/roz/2.jpg",  loc:"" },
+  { src:"assets/roz/3.jpg",  loc:"" },
+  { src:"assets/roz/4.jpg",  loc:"" },
+  { src:"assets/roz/5.jpg",  loc:"" },
+  { src:"assets/roz/6.jpg",  loc:"" },
+  { src:"assets/roz/7.jpg",  loc:"محمد محمدی، ۲۳ ساله" },
+  { src:"assets/roz/8.jpg",  loc:"" },
+  { src:"assets/roz/9.jpg",  loc:"" },
+  { src:"assets/roz/10.jpg", loc:"" },
+  { src:"assets/roz/11.jpg", loc:"" },
+  { src:"assets/roz/12.jpg", loc:"" },
+  { src:"assets/roz/13.jpg", loc:"" },
+  { src:"assets/roz/14.jpg", loc:"" },
+  { src:"assets/roz/15.jpg", loc:"" },
+  { src:"assets/roz/16.jpg", loc:"" },
+];
+
+/* سرعت چرخش هر عکس بر حسب ثانیه — فقط همین عدد را عوض کن */
+const IMAGE_SECONDS = 5;
+
+const galleryEl= document.getElementById('gallery');
+const slidesEl = document.getElementById('slides');
+const dotsEl   = document.getElementById('dots');
+const locEl    = document.getElementById('loc');
+const locText  = document.getElementById('locText');
+const standalone = (window.parent === window);
+
+/* عکس‌ها ممکن است با ترتیب متفاوت لود شوند؛ ترتیب اصلی را حفظ می‌کنیم */
+let loaded = new Array(ITEMS.length).fill(null), ready = 0;
+ITEMS.forEach((it,i)=>{
+  const img = new Image();
+  img.onload  = ()=>{ loaded[i]=it; done(); };
+  img.onerror = ()=>{ done(); };
+  img.src = it.src;
+});
+function done(){ ready++; if(ready===ITEMS.length) build(); }
+
+let live = [];
+function build(){
+  live = loaded.filter(Boolean); /* فقط عکس‌های موجود، به ترتیب ۱ تا ۱۶ */
+  if(!live.length){
+    if(standalone){ galleryEl.style.display=''; showDemo(); }
+    return; /* در سایت: پنهان بماند */
+  }
+  galleryEl.style.display='';
+  live.forEach(()=>{
+    const s=document.createElement('div'); s.className='slide'; slidesEl.appendChild(s);
+    const d=document.createElement('i'); dotsEl.appendChild(d);
+  });
+  const slideEls=slidesEl.querySelectorAll('.slide');
+  live.forEach((it,i)=>{ slideEls[i].innerHTML='<img src="'+it.src+'" alt="">'; });
+  start(slideEls, dotsEl.querySelectorAll('i'));
+  try{ if(!standalone) window.parent.postMessage('rooydad-ready','*'); }catch(e){}
+}
+function showDemo(){
+  slidesEl.innerHTML='<div class="slide active"><div class="demo" style="background:linear-gradient(135deg,#6366f1,#22d3ee)"><div><div class="big">📷</div><div class="txt">عکس‌ها را در پوشه assets/roz بگذار<br>(۱.jpg تا ۱۶.jpg)</div></div></div></div>';
+}
+let idx=0, timer=null;
+function start(slideEls, dotEls){
+  function show(n){
+    clearTimeout(timer);
+    slideEls.forEach(s=>s.classList.remove('active'));
+    dotEls.forEach(d=>d.classList.remove('on'));
+    slideEls[n].classList.add('active');
+    const it=live[n];
+    if(it.loc){ locText.textContent=it.loc; locEl.style.display='flex'; } else locEl.style.display='none';
+    const dur=IMAGE_SECONDS*1000;
+    const dot=dotEls[n]; dot.style.setProperty('--dur',(dur/1000)+'s'); dot.classList.add('on');
+    timer=setTimeout(()=>{ idx=(idx+1)%live.length; show(idx); }, dur);
+  }
+  show(0);
+}
+</script>
+</body>
+</html>

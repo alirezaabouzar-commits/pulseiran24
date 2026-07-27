@@ -1,0 +1,19 @@
+{
+  "name": "Pulse Iran 24 | پالس ایران ۲۴",
+  "short_name": "Pulse Iran 24",
+  "description": "کانال خبری فارسی‌زبان — اخبار لحظه به لحظه ایران و جهان.",
+  "lang": "fa-IR",
+  "dir": "rtl",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0D1117",
+  "theme_color": "#0D1117",
+  "categories": ["news", "magazines"],
+  "icons": [
+    { "src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

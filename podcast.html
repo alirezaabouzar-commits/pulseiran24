@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>پادکست پالس روز — پالس ایران ۲۴</title>
+<meta name="description" content="پادکست خبری روزانه پالس ایران ۲۴ — مهم‌ترین خبرهای ایران و جهان در چند دقیقه.">
+<link rel="icon" href="/favicon.ico">
+<style>
+  :root{
+    --bg:#0D1117; --panel:#161b22; --line:#2a2f3a;
+    --gold:#F5C518; --text:#e8edf3; --muted:#9aa4b2;
+    --accent:#e5484d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);
+    font-family:'Vazirmatn',Tahoma,'Segoe UI',system-ui,sans-serif;line-height:1.8}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:760px;margin:0 auto;padding:0 18px 80px}
+
+  /* هدر */
+  header{padding:26px 0 20px;border-bottom:1px solid var(--line);margin-bottom:24px}
+  .topline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .back{color:var(--muted);font-size:14px;display:inline-flex;align-items:center;gap:6px}
+  .back:hover{color:var(--gold)}
+  .brand{display:flex;align-items:center;gap:12px;margin-top:16px}
+  .brand .mic{width:52px;height:52px;border-radius:14px;background:var(--panel);
+    border:1px solid var(--line);display:grid;place-items:center;font-size:26px}
+  .brand h1{font-size:24px;font-weight:800}
+  .brand .sub{color:var(--gold);font-size:14px;font-weight:700}
+  .intro{color:var(--muted);font-size:15px;margin-top:14px}
+
+  /* پخش‌کننده */
+  .player{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+    padding:18px;margin:22px 0;display:none}
+  .player.on{display:block}
+  .player .now{font-size:13px;color:var(--muted);margin-bottom:4px}
+  .player .ptitle{font-weight:800;font-size:17px;margin-bottom:12px}
+  audio{width:100%;filter:invert(0);border-radius:10px}
+
+  /* لیست قسمت‌ها */
+  .eplist{display:grid;gap:12px}
+  .ep{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;
+    transition:border-color .2s ease, transform .1s ease}
+  .ep:hover{border-color:var(--gold);transform:translateY(-2px)}
+  .ep .play{flex-shrink:0;width:46px;height:46px;border-radius:50%;
+    background:var(--gold);color:#111;display:grid;place-items:center;font-size:18px}
+  .ep .meta{flex:1;min-width:0}
+  .ep .t{font-weight:800;font-size:16px}
+  .ep .d{color:var(--muted);font-size:13px;margin-top:2px}
+  .ep .len{color:var(--muted);font-size:12px;flex-shrink:0}
+
+  /* حالت خالی */
+  .empty{background:var(--panel);border:1px dashed var(--line);border-radius:18px;
+    padding:40px 20px;text-align:center;color:var(--muted)}
+  .empty .big{font-size:40px;margin-bottom:10px}
+
+  /* بخش خبرگزاری‌ها */
+  .intl-block{margin-top:40px;padding-top:26px;border-top:1px solid var(--line)}
+  .intl-title{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .intl-title .ic{font-size:22px}
+  .intl-title h2{font-size:20px;font-weight:800}
+  .intl-note{color:var(--muted);font-size:14px;margin-bottom:18px}
+  .lang-head{color:var(--gold);font-weight:800;font-size:14px;margin:20px 0 10px;letter-spacing:.3px}
+  .loading{color:var(--muted);text-align:center;padding:24px}
+  .pod{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:13px 15px;display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:10px;
+    transition:border-color .2s ease}
+  .pod:hover{border-color:var(--gold)}
+  .pod .p{flex-shrink:0;width:40px;height:40px;border-radius:50%;background:#222833;
+    color:var(--gold);display:grid;place-items:center;font-size:15px;border:1px solid var(--line)}
+  .pod .m{flex:1;min-width:0}
+  .pod .src{font-weight:800;font-size:15px}
+  .pod .ti{color:var(--muted);font-size:13px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="topline">
+      <a class="back" href="/">‹ بازگشت به سایت</a>
+      <span style="color:var(--muted);font-size:13px">pulseiran24.com</span>
+    </div>
+    <div class="brand">
+      <div class="mic">🎙</div>
+      <div>
+        <h1>پادکست پالس روز</h1>
+        <div class="sub">پالس ایران ۲۴ · خبری روزانه</div>
+      </div>
+    </div>
+    <p class="intro">مهم‌ترین خبرهای ایران و جهان، در چند دقیقه — با اتکا به منابع معتبر بین‌المللی و بازنویسی مستقل.</p>
+  </header>
+
+  <!-- پخش‌کننده -->
+  <div class="player" id="player">
+    <div class="now">در حال پخش:</div>
+    <div class="ptitle" id="pTitle">—</div>
+    <audio id="audio" controls preload="none"></audio>
+  </div>
+
+  <!-- لیست قسمت‌ها -->
+  <div class="eplist" id="eplist"></div>
+
+  <!-- پادکست خبرگزاری‌های معتبر -->
+  <div class="intl-block">
+    <div class="intl-title">
+      <span class="ic">🌍</span>
+      <h2>پادکست خبرگزاری‌های معتبر</h2>
+    </div>
+    <p class="intl-note">آخرین قسمت پادکست خبری معتبرترین رسانه‌های جهان — به فارسی، آلمانی و انگلیسی.</p>
+    <div id="intlPods"><div class="loading">در حال بارگذاری…</div></div>
+  </div>
+
+  <footer>پادکست پالس روز · تولید و انتشار: پالس ایران ۲۴</footer>
+</div>
+
+<script>
+/* ============================================================
+   قسمت‌های پادکست را اینجا اضافه کن. برای هر قسمت یک بلوک:
+     { title:"...", date:"...", len:"", src:"assets/podcast/ep1.mp3" }
+   • فایل صوتی را با اسم دلخواه در پوشه assets/podcast بگذار
+   • جدیدترین قسمت را بالای لیست بگذار
+   • تا وقتی قسمتی نباشد، پیام «به‌زودی» نشان داده می‌شود
+   ============================================================ */
+const EPISODES = [
+  // { title:"پالس روز — قسمت اول", date:"۲۸ تیر ۱۴۰۵", len:"", src:"assets/podcast/ep1.mp3" },
+];
+
+const listEl = document.getElementById('eplist');
+const playerEl = document.getElementById('player');
+const audioEl = document.getElementById('audio');
+const pTitle = document.getElementById('pTitle');
+
+if (!EPISODES.length) {
+  listEl.innerHTML =
+    '<div class="empty"><div class="big">🎧</div>' +
+    '<div style="font-weight:800;color:#e8edf3;font-size:18px;margin-bottom:6px">به‌زودی</div>' +
+    '<div>اولین قسمت پادکست پالس روز به‌زودی منتشر می‌شود.</div></div>';
+} else {
+  EPISODES.forEach(function(ep, i){
+    const card = document.createElement('div');
+    card.className = 'ep';
+    card.innerHTML =
+      '<div class="play">▶</div>' +
+      '<div class="meta"><div class="t">'+ep.title+'</div>'+
+      '<div class="d">'+(ep.date||'')+'</div></div>' +
+      (ep.len ? '<div class="len">'+ep.len+'</div>' : '');
+    card.addEventListener('click', function(){ playEp(ep); });
+    listEl.appendChild(card);
+  });
+}
+
+function playEp(ep){
+  pTitle.textContent = ep.title;
+  audioEl.src = ep.src;
+  playerEl.classList.add('on');
+  audioEl.play().catch(function(){});
+  playerEl.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+/* ---------- پادکست خبرگزاری‌های معتبر ---------- */
+const LANG_NAMES = { fa: "فارسی", de: "آلمانی", en: "انگلیسی" };
+const intlBox = document.getElementById('intlPods');
+
+fetch('/api/podcasts')
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    const items = (data && data.items) || [];
+    if (!items.length){
+      intlBox.innerHTML = '<div class="loading">فعلاً پادکستی در دسترس نیست.</div>';
+      return;
+    }
+    let html = '';
+    ['fa','de','en'].forEach(function(lang){
+      const group = items.filter(function(x){ return x.lang === lang; });
+      if (!group.length) return;
+      html += '<div class="lang-head">'+ LANG_NAMES[lang] +'</div>';
+      group.forEach(function(x){
+        const safeTitle = (x.title||'').replace(/"/g,'&quot;');
+        html += '<div class="pod" data-audio="'+ encodeURIComponent(x.audio) +'" data-src="'+ safeTitle +'">'
+          + '<div class="p">▶</div>'
+          + '<div class="m"><div class="src">'+ x.name +'</div>'
+          + '<div class="ti">'+ (x.title||'آخرین قسمت') +'</div></div></div>';
+      });
+    });
+    intlBox.innerHTML = html;
+    intlBox.querySelectorAll('.pod').forEach(function(el){
+      el.addEventListener('click', function(){
+        playEp({ title: el.getAttribute('data-src') || 'پادکست', src: decodeURIComponent(el.getAttribute('data-audio')) });
+      });
+    });
+  })
+  .catch(function(){
+    intlBox.innerHTML = '<div class="loading">در حال حاضر امکان بارگذاری نیست.</div>';
+  });
+</script>
+</body>
+</html>

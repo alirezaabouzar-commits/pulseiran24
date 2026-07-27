@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>جراید بین‌المللی — پالس ایران ۲۴</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0D1117;--surface:#161C26;--surface2:#1c2532;--line:#2A3442;--text:#E9EDF2;--dim:#8B96A5;--pulse:#FF2D4A;--tg:#2AABEE;--flagbg:rgba(13,17,23,.85);--covshadow:rgba(0,0,0,.4)}
+  html[data-theme="light"]{--surface:#FFFFFF;--surface2:#F1F3F7;--line:#E3E7EE;--text:#1B2430;--dim:#5C6878;--flagbg:rgba(27,36,48,.82);--covshadow:rgba(0,0,0,.12)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:transparent;color:var(--text);font-family:'Vazirmatn',Tahoma,sans-serif;line-height:1.7}
+  .wrap{max-width:1000px;margin:0 auto;padding:6px 4px 20px}
+  .tabs{display:flex;gap:8px;margin:0 0 18px;flex-wrap:wrap}
+  .tab{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:8px 18px;font-family:inherit;font-size:.95rem;cursor:pointer;transition:.15s;white-space:nowrap}
+  .tab:hover{border-color:var(--pulse)}
+  .tab.active{background:var(--pulse);color:#fff;border-color:var(--pulse)}
+  .panel{display:none}
+  .panel.active{display:block}
+  .state{text-align:center;color:var(--dim);padding:40px 12px;font-size:.98rem}
+  /* covers */
+  .covers{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
+  .cover{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;text-decoration:none;color:var(--text);display:flex;flex-direction:column;transition:.18s}
+  .cover:hover{transform:translateY(-3px);border-color:var(--pulse);box-shadow:0 10px 28px var(--covshadow)}
+  .cover .imgbox{position:relative;aspect-ratio:3/4;background:var(--surface2);overflow:hidden}
+  .cover img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+  .cover .meta{padding:9px 11px}
+  .cover .nm{font-size:.86rem;font-weight:700;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cover .co{font-size:.72rem;color:var(--dim);margin-top:2px}
+  .cover .flag{position:absolute;top:8px;right:8px;background:var(--flagbg);color:#fff;font-size:.68rem;padding:3px 8px;border-radius:999px}
+  /* headlines */
+  .hl-src{margin:0 0 8px;font-weight:800;color:var(--pulse);font-size:1rem;display:flex;align-items:center;gap:8px}
+  .hl-src::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--pulse)}
+  .hl-group{margin-bottom:22px}
+  .hl-item{display:block;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px 14px;margin-bottom:8px;font-size:.95rem;transition:.15s}
+  .hl-item:hover{border-color:var(--tg);background:var(--surface2)}
+  /* directory */
+  .dir{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+  .dir a{display:flex;align-items:center;gap:11px;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 15px;transition:.15s}
+  .dir a:hover{border-color:var(--pulse);background:var(--surface2)}
+  .dir .ic{flex:0 0 34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--pulse),#c81e38);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.95rem;color:#fff}
+  .dir .tx b{display:block;font-size:.95rem}
+  .dir .tx span{font-size:.76rem;color:var(--dim)}
+  .note{color:var(--dim);font-size:.8rem;text-align:center;margin-top:18px}
+  .pick{text-align:center;color:var(--dim);padding:26px 12px;font-size:.95rem}
+  .closehint{text-align:center;color:var(--dim);font-size:.8rem;margin:0 0 14px}
+  .more-wrap{text-align:center;margin-top:18px}
+  .more-btn{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:10px 24px;font-family:inherit;font-size:.92rem;cursor:pointer;transition:.15s}
+  .more-btn:hover{border-color:var(--pulse);background:var(--surface2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab" data-t="covers">🗞️ صفحه اول</button>
+    <button class="tab" data-t="news">📰 تیترها</button>
+    <button class="tab" data-t="dir">🔗 روزنامه‌ها</button>
+  </div>
+
+  <div class="pick" id="pick">برای نمایش، یکی از گزینه‌های بالا را انتخاب کنید 👆</div>
+  <div class="closehint" id="closehint" style="display:none">برای بستن، دوباره روی همان گزینه بزنید ✕</div>
+
+  <div class="panel" id="p-covers">
+    <div class="state" id="covers-state">در حال دریافت صفحه اول روزنامه‌ها…</div>
+    <div class="covers" id="covers"></div>
+    <div id="covers-more"></div>
+  </div>
+
+  <div class="panel" id="p-news">
+    <div class="state" id="news-state">در حال دریافت تیترها…</div>
+    <div id="news"></div>
+  </div>
+
+  <div class="panel" id="p-dir">
+    <div class="dir" id="dir"></div>
+    <div class="note">با کلیک روی هر مورد، سایت رسمی روزنامه در تب جدید باز می‌شود.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var t='light'; try{ t=localStorage.getItem('pi24-theme')||'light'; }catch(e){}
+  document.documentElement.setAttribute('data-theme', t);
+  window.addEventListener('message', function(e){
+    if(e.data && e.data.type==='pi24-theme'){ document.documentElement.setAttribute('data-theme', e.data.theme); }
+    if(e.data && e.data.type==='pi24-lang'){ applyJLang(e.data.lang); }
+  });
+})();
+var JL = 'fa';
+var JI18N = {
+  fa: { dir:'rtl', covers:'🗞️ صفحه اول', news:'📰 تیترها', dir_tab:'🔗 روزنامه‌ها', pick:'برای نمایش، یکی از گزینه‌های بالا را انتخاب کنید 👆', closehint:'برای بستن، دوباره روی همان گزینه بزنید ✕', note:'با کلیک روی هر مورد، سایت رسمی روزنامه در تب جدید باز می‌شود.', loadingCovers:'در حال دریافت صفحه اول روزنامه‌ها…', loadingNews:'در حال دریافت تیترها…', more:'نمایش روزنامه‌های بیشتر' },
+  en: { dir:'ltr', covers:'🗞️ Front Pages', news:'📰 Headlines', dir_tab:'🔗 Newspapers', pick:'Pick one of the options above to view 👆', closehint:'Click the same option again to close ✕', note:'Clicking any item opens the newspaper\u2019s official site in a new tab.', loadingCovers:'Loading front pages…', loadingNews:'Loading headlines…', more:'Show more newspapers' },
+  de: { dir:'ltr', covers:'🗞️ Titelseiten', news:'📰 Schlagzeilen', dir_tab:'🔗 Zeitungen', pick:'Wählen Sie oben eine Option aus 👆', closehint:'Zum Schließen erneut auf dieselbe Option klicken ✕', note:'Ein Klick öffnet die offizielle Website der Zeitung in einem neuen Tab.', loadingCovers:'Titelseiten werden geladen…', loadingNews:'Schlagzeilen werden geladen…', more:'Weitere Zeitungen anzeigen' }
+};
+function applyJLang(lang){
+  if(!JI18N[lang]) lang = 'fa';
+  JL = lang;
+  var L = JI18N[lang];
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('dir', L.dir);
+  var tabs = document.querySelectorAll('.tab');
+  if(tabs[0]) tabs[0].textContent = L.covers;
+  if(tabs[1]) tabs[1].textContent = L.news;
+  if(tabs[2]) tabs[2].textContent = L.dir_tab;
+  var pk = document.getElementById('pick'); if(pk) pk.textContent = L.pick;
+  var ch = document.getElementById('closehint'); if(ch) ch.textContent = L.closehint;
+  var nt = document.querySelector('.note'); if(nt) nt.textContent = L.note;
+  var cs = document.getElementById('covers-state'); if(cs && cs.style.display !== 'none') cs.textContent = L.loadingCovers;
+  var ns = document.getElementById('news-state'); if(ns && ns.style.display !== 'none') ns.textContent = L.loadingNews;
+  var mb = document.querySelector('.more-btn'); if(mb){ var m = mb.textContent.match(/\((\d+)\)/); mb.textContent = L.more + (m ? ' (' + m[1] + ')' : ''); }
+}
+</script>
+<script>
+/* لیست دایرکتوری روزنامه‌ها (لینک مستقیم به سایت رسمی) */
+const DIRECTORY = [
+  { n:"The Guardian",    u:"https://www.theguardian.com/international", c:"بریتانیا" },
+  { n:"BBC News",        u:"https://www.bbc.com/news",                 c:"بریتانیا" },
+  { n:"The New York Times", u:"https://www.nytimes.com",              c:"آمریکا" },
+  { n:"The Washington Post", u:"https://www.washingtonpost.com",      c:"آمریکا" },
+  { n:"Reuters",         u:"https://www.reuters.com",                 c:"بین‌المللی" },
+  { n:"Associated Press",u:"https://apnews.com",                      c:"آمریکا" },
+  { n:"Financial Times", u:"https://www.ft.com",                      c:"بریتانیا" },
+  { n:"Al Jazeera",      u:"https://www.aljazeera.com",               c:"قطر" },
+  { n:"Le Monde",        u:"https://www.lemonde.fr/en/",              c:"فرانسه" },
+  { n:"France 24",       u:"https://www.france24.com/en/",            c:"فرانسه" },
+  { n:"Deutsche Welle",  u:"https://www.dw.com/en/",                  c:"آلمان" },
+  { n:"Der Spiegel",     u:"https://www.spiegel.de/international/",    c:"آلمان" },
+  { n:"El País",         u:"https://english.elpais.com",              c:"اسپانیا" },
+  { n:"The Times of Israel", u:"https://www.timesofisrael.com",       c:"اسرائیل" },
+  { n:"The Independent", u:"https://www.independent.co.uk",           c:"بریتانیا" },
+  { n:"Politico",        u:"https://www.politico.com",                c:"آمریکا" }
+];
+
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[<>&"]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];}); }
+
+/* تب‌ها */
+let loaded = { covers:false, news:false };
+document.querySelectorAll('.tab').forEach(function(btn){
+  btn.onclick = function(){
+    const t = btn.dataset.t;
+    const wasActive = btn.classList.contains('active');
+    /* اول همه را ببند */
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    if(wasActive){
+      /* کلیک دوباره روی تب باز = بستن و بازگشت به حالت جمع‌وجور */
+      if(el('closehint')) el('closehint').style.display='none';
+      if(el('pick')) el('pick').style.display='';
+      setTimeout(postHeight, 60);
+      return;
+    }
+    btn.classList.add('active');
+    if(el('pick')) el('pick').style.display='none';
+    if(el('closehint')) el('closehint').style.display='';
+    el('p-'+t).classList.add('active');
+    if(t==='covers' && !loaded.covers){ loaded.covers=true; loadCovers(); }
+    if(t==='news' && !loaded.news){ loaded.news=true; loadNews(); }
+    setTimeout(postHeight, 60);
+  };
+});
+
+/* صفحه اول */
+const COVERS_FIRST = 8;
+function renderCover(box, c){
+  const a = document.createElement('a');
+  a.className='cover'; a.href=c.link; a.target='_blank'; a.rel='noopener';
+  a.innerHTML =
+    '<div class="imgbox"><span class="flag">'+esc(c.country)+'</span>'+
+    '<img loading="lazy" src="'+esc(c.img)+'" alt="'+esc(c.name)+'" '+
+    'onerror="this.closest(&quot;.cover&quot;).style.display=&quot;none&quot;"></div>'+
+    '<div class="meta"><div class="nm">'+esc(c.name)+'</div></div>';
+  box.appendChild(a);
+}
+function loadCovers(){
+  fetch('/api/press-covers').then(r=>r.json()).then(function(j){
+    if(!j.ok || !j.covers || !j.covers.length){ el('covers-state').textContent='فعلاً در دسترس نیست، بعداً دوباره امتحان کنید.'; return; }
+    el('covers-state').style.display='none';
+    const box = el('covers'); box.innerHTML='';
+    const moreBox = el('covers-more'); moreBox.innerHTML='';
+    const all = j.covers;
+    all.slice(0, COVERS_FIRST).forEach(function(c){ renderCover(box, c); });
+    if(all.length > COVERS_FIRST){
+      const wrap = document.createElement('div'); wrap.className='more-wrap';
+      const btn = document.createElement('button'); btn.className='more-btn';
+      btn.textContent=(JI18N[JL]||JI18N.fa).more + ' (' + (all.length - COVERS_FIRST) + ')';
+      btn.onclick = function(){
+        all.slice(COVERS_FIRST).forEach(function(c){ renderCover(box, c); });
+        moreBox.innerHTML='';
+        setTimeout(postHeight, 80);
+      };
+      wrap.appendChild(btn); moreBox.appendChild(wrap);
+    }
+    setTimeout(postHeight, 80);
+  }).catch(function(){ el('covers-state').textContent='خطا در دریافت. اتصال را بررسی کنید.'; });
+}
+
+/* تیترها */
+function loadNews(){
+  fetch('/api/press-news').then(r=>r.json()).then(function(j){
+    if(!j.ok || !j.items || !j.items.length){ el('news-state').textContent='فعلاً در دسترس نیست، بعداً دوباره امتحان کنید.'; return; }
+    el('news-state').style.display='none';
+    const groups = {};
+    j.items.forEach(function(it){ (groups[it.s]=groups[it.s]||[]).push(it); });
+    const box = el('news'); box.innerHTML='';
+    Object.keys(groups).forEach(function(src){
+      const g = document.createElement('div'); g.className='hl-group';
+      let html = '<div class="hl-src">'+esc(src)+'</div>';
+      groups[src].forEach(function(it){
+        html += '<a class="hl-item" href="'+esc(it.l)+'" target="_blank" rel="noopener">'+esc(it.t)+'</a>';
+      });
+      g.innerHTML = html; box.appendChild(g);
+    });
+  }).catch(function(){ el('news-state').textContent='خطا در دریافت. اتصال را بررسی کنید.'; });
+}
+
+/* دایرکتوری */
+(function(){
+  const box = el('dir');
+  DIRECTORY.forEach(function(d){
+    const a = document.createElement('a');
+    a.href=d.u; a.target='_blank'; a.rel='noopener';
+    a.innerHTML = '<span class="ic">'+esc(d.n.charAt(0))+'</span><span class="tx"><b>'+esc(d.n)+'</b><span>'+esc(d.c)+'</span></span>';
+    box.appendChild(a);
+  });
+})();
+
+/* گزارش ارتفاع به صفحه‌ی والد تا قاب خودکار قد بکشد (بدون اسکرول تودرتو) */
+function postHeight(){
+  try{
+    if(window.parent!==window){
+      window.parent.postMessage({ type:'jarayed-height', height: document.body.scrollHeight }, '*');
+    }
+  }catch(e){}
+}
+if(window.ResizeObserver){
+  new ResizeObserver(function(){ postHeight(); }).observe(document.body);
+}else{
+  window.addEventListener('load', postHeight);
+  setInterval(postHeight, 1500);
+}
+
+/* هیچ تبی از ابتدا لود نمی‌شود؛ فقط با کلیک باز و لود می‌شود */
+
+/* اطلاع به صفحه‌ی والد (وقتی داخل iframe است) */
+try{ if(window.parent!==window){ window.parent.postMessage('jarayed-ready','*'); postHeight(); } }catch(e){}
+</script>
+</body>
+</html>

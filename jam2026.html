@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نتایج زنده فوتبال | Pulse Iran 24</title>
+<meta name="description" content="نتایج زنده فوتبال: جام جهانی و لیگ‌های معتبر اروپا – گل‌ها، تعویض‌ها و کارت‌ها دقیقه به دقیقه – Pulse Iran 24">
+<meta name="theme-color" content="#0D1117">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pulse Iran 24">
+<meta property="og:title" content="نتایج زنده فوتبال | Pulse Iran 24">
+<meta property="og:description" content="نتایج زنده فوتبال: جام جهانی و لیگ‌های معتبر اروپا – دقیقه به دقیقه.">
+<meta property="og:url" content="https://pulseiran24.com/jam2026.html">
+<meta property="og:image" content="https://pulseiran24.com/assets/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://pulseiran24.com/assets/og-image.jpg">
+<link rel="icon" href="/assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#0B1220;
+    --surface:#111C30;
+    --surface2:#16233C;
+    --line:#22314E;
+    --text:#E7ECF5;
+    --muted:#8FA0BC;
+    --live:#22C55E;
+    --goal:#F5B301;
+    --red:#E14B4B;
+    --yellow:#F2C037;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:'Vazirmatn',Tahoma,sans-serif;
+    background:var(--night);
+    color:var(--text);
+    min-height:100vh;
+    font-size:15px;
+    line-height:1.7;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:0 14px 60px}
+
+  /* ---------- header ---------- */
+  header{
+    padding:22px 0 14px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:18px;
+  }
+  .brand{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+  }
+  .brand h1{
+    font-size:22px;font-weight:900;letter-spacing:-.3px;
+  }
+  .brand h1 span{color:var(--goal)}
+  .channel{
+    font-size:11px;font-weight:700;color:var(--muted);
+    border:1px solid var(--line);border-radius:999px;
+    padding:4px 12px;white-space:nowrap;
+  }
+  .updated{
+    margin-top:8px;font-size:12px;color:var(--muted);
+    display:flex;align-items:center;gap:6px;
+  }
+  .updated .dot{
+    width:7px;height:7px;border-radius:50%;background:var(--live);
+    animation:pulse 1.6s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @media (prefers-reduced-motion:reduce){
+    .updated .dot,.badge-live::before{animation:none}
+  }
+
+  /* ---------- day tabs ---------- */
+  .daybar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .daybar button{
+    font-family:inherit;font-size:13px;font-weight:700;
+    background:var(--surface);color:var(--muted);
+    border:1px solid var(--line);border-radius:10px;
+    padding:7px 14px;cursor:pointer;
+  }
+  .daybar button.active{background:var(--surface2);color:var(--text);border-color:var(--live)}
+  .daybar button:focus-visible{outline:2px solid var(--live);outline-offset:2px}
+
+  /* ---------- match card ---------- */
+  .match{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:16px;
+    margin-bottom:16px;
+    overflow:hidden;
+  }
+  .match.is-live{border-color:rgba(34,197,94,.55)}
+  .match-top{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 14px;font-size:12px;color:var(--muted);
+    border-bottom:1px solid var(--line);
+  }
+  .badge-live{
+    color:var(--live);font-weight:900;display:flex;align-items:center;gap:6px;
+  }
+  .badge-live::before{
+    content:'';width:8px;height:8px;border-radius:50%;
+    background:var(--live);animation:pulse 1.2s infinite;
+  }
+  .scoreline{
+    display:grid;grid-template-columns:1fr auto 1fr;
+    align-items:center;gap:8px;
+    padding:16px 14px;
+  }
+  .team{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+  .team img{width:44px;height:44px;object-fit:contain}
+  .team .tname{
+    font-size:14px;font-weight:700;text-align:center;
+    overflow-wrap:break-word;max-width:100%;
+  }
+  .score{
+    font-size:34px;font-weight:900;letter-spacing:2px;
+    font-variant-numeric:tabular-nums;
+    background:var(--night);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:6px 16px;
+    white-space:nowrap;
+    direction:ltr;
+  }
+  .minute{
+    text-align:center;font-size:13px;font-weight:900;color:var(--live);
+    padding-bottom:12px;
+  }
+  .minute.ft{color:var(--muted)}
+  .pens{
+    text-align:center;font-size:12px;color:var(--goal);
+    padding-bottom:10px;font-weight:700;
+  }
+
+  /* ---------- events timeline ---------- */
+  .events{
+    border-top:1px solid var(--line);
+    padding:12px 14px 14px;
+    position:relative;
+  }
+  .events::before{
+    content:'';position:absolute;top:14px;bottom:14px;right:34px;
+    width:2px;background:var(--line);border-radius:2px;
+  }
+  .ev{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:6px 0;position:relative;font-size:13px;
+  }
+  .ev .m{
+    width:40px;flex:0 0 40px;text-align:center;
+    font-weight:900;font-variant-numeric:tabular-nums;
+    color:var(--muted);background:var(--surface);
+    position:relative;z-index:1;font-size:12px;padding-top:2px;
+  }
+  .ev .ico{flex:0 0 22px;text-align:center;font-size:15px;padding-top:1px}
+  .ev .txt{flex:1;min-width:0}
+  .ev .who{font-weight:700}
+  .ev .sub{color:var(--muted);font-size:12px}
+  .ev.goal .m{color:var(--goal)}
+  .ev.goal .who{color:var(--goal)}
+  .ev.redcard .who{color:var(--red)}
+  .ev-team{
+    font-size:11px;color:var(--muted);
+  }
+  .noev{color:var(--muted);font-size:13px;text-align:center;padding:4px 0}
+
+  /* ---------- states ---------- */
+  .notice{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:14px;padding:20px 16px;text-align:center;
+    color:var(--muted);font-size:14px;margin-top:10px;
+  }
+  .notice strong{color:var(--text)}
+  footer{
+    margin-top:28px;text-align:center;font-size:11px;color:var(--muted);
+    line-height:2;
+  }
+  footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1 id="pageTitle">جام جهانی <span>۲۰۲۶</span></h1>
+      <div class="channel">Pulse Iran 24 ⚽ گزارش زنده</div>
+    </div>
+    <div class="updated"><span class="dot" aria-hidden="true"></span><span id="updated">در حال دریافت اطلاعات…</span></div>
+  </header>
+
+  <nav class="daybar" id="leaguebar" aria-label="انتخاب لیگ">
+    <button class="active" data-league="wc">جام جهانی</button>
+    <button data-league="ucl">لیگ قهرمانان</button>
+    <button data-league="epl">لیگ برتر</button>
+    <button data-league="bundesliga">بوندسلیگا</button>
+    <button data-league="laliga">لالیگا</button>
+    <button data-league="seriea">سری آ</button>
+    <button data-league="ligue1">لوشامپیونه</button>
+  </nav>
+
+  <nav class="daybar" id="daybar" aria-label="انتخاب روز">
+    <button class="active" data-day="today">امروز</button>
+    <button data-day="yesterday">دیروز</button>
+    <button data-day="tomorrow">فردا</button>
+  </nav>
+
+  <main id="app" aria-live="polite">
+    <div class="notice">در حال بارگذاری بازی‌ها…</div>
+  </main>
+
+  <footer>
+    منبع آمار: ESPN · به‌روزرسانی خودکار هر ۶۰ ثانیه<br>
+    این صفحه فقط آمار و گزارش متنی ارائه می‌دهد و هیچ پخش ویدیویی ندارد.<br>
+    © Pulse Iran 24
+  </footer>
+</div>
+
+<script>
+/* =========================================================
+   Pulse Iran 24 – World Cup 2026 Live Ticker
+   Data: fetched from /api/worldcup (Cloudflare Worker proxy)
+   ========================================================= */
+
+const API = '/api/worldcup';
+const REFRESH_MS = 60000;
+let currentDay = 'today';
+let currentLeague = 'wc';
+const LEAGUE_TITLES = {
+  wc: 'جام جهانی <span>۲۰۲۶</span>',
+  ucl: 'لیگ قهرمانان <span>اروپا</span>',
+  epl: 'لیگ برتر <span>انگلیس</span>',
+  bundesliga: '<span>بوندسلیگا</span>',
+  laliga: '<span>لالیگا</span>',
+  seriea: '<span>سری آ</span>',
+  ligue1: '<span>لوشامپیونه</span>'
+};
+let timer = null;
+
+/* ---- Persian names for national teams ---- */
+const FA = {
+  'Argentina':'آرژانتین','Brazil':'برزیل','France':'فرانسه','England':'انگلیس',
+  'Germany':'آلمان','Spain':'اسپانیا','Portugal':'پرتغال','Netherlands':'هلند',
+  'Italy':'ایتالیا','Belgium':'بلژیک','Croatia':'کرواسی','Morocco':'مراکش',
+  'Iran':'ایران','Japan':'ژاپن','South Korea':'کره جنوبی','Korea Republic':'کره جنوبی',
+  'Saudi Arabia':'عربستان','Qatar':'قطر','USA':'آمریکا','United States':'آمریکا',
+  'Mexico':'مکزیک','Canada':'کانادا','Uruguay':'اروگوئه','Colombia':'کلمبیا',
+  'Ecuador':'اکوادور','Chile':'شیلی','Peru':'پرو','Paraguay':'پاراگوئه',
+  'Senegal':'سنگال','Ghana':'غنا','Nigeria':'نیجریه','Cameroon':'کامرون',
+  'Tunisia':'تونس','Algeria':'الجزایر','Egypt':'مصر','Ivory Coast':'ساحل عاج',
+  'Australia':'استرالیا','New Zealand':'نیوزیلند','Switzerland':'سوئیس',
+  'Austria':'اتریش','Poland':'لهستان','Denmark':'دانمارک','Sweden':'سوئد',
+  'Norway':'نروژ','Serbia':'صربستان','Turkey':'ترکیه','Türkiye':'ترکیه',
+  'Ukraine':'اوکراین','Scotland':'اسکاتلند','Wales':'ولز','Ireland':'ایرلند',
+  'Czech Republic':'جمهوری چک','Czechia':'جمهوری چک','Slovakia':'اسلواکی',
+  'Slovenia':'اسلوونی','Romania':'رومانی','Hungary':'مجارستان','Greece':'یونان',
+  'Russia':'روسیه','Uzbekistan':'ازبکستان','Jordan':'اردن','Iraq':'عراق',
+  'UAE':'امارات','United Arab Emirates':'امارات','China':'چین','India':'هند',
+  'Panama':'پاناما','Costa Rica':'کاستاریکا','Honduras':'هندوراس',
+  'Jamaica':'جامائیکا','Haiti':'هائیتی','Curacao':'کوراسائو',
+  'South Africa':'آفریقای جنوبی','Cape Verde':'کیپ‌ورد','Mali':'مالی',
+  'Burkina Faso':'بورکینافاسو','DR Congo':'جمهوری دموکراتیک کنگو',
+  'Bolivia':'بولیوی','Venezuela':'ونزوئلا',
+  /* باشگاه‌ها */
+  'Real Madrid':'رئال مادرید','Barcelona':'بارسلونا','Atletico Madrid':'اتلتیکو مادرید',
+  'Atlético Madrid':'اتلتیکو مادرید','Sevilla':'سویا','Real Sociedad':'رئال سوسیداد',
+  'Athletic Club':'اتلتیک بیلبائو','Villarreal':'ویارئال','Real Betis':'رئال بتیس',
+  'Valencia':'والنسیا','Girona':'خیرونا',
+  'Manchester City':'منچسترسیتی','Manchester United':'منچستریونایتد','Liverpool':'لیورپول',
+  'Arsenal':'آرسنال','Chelsea':'چلسی','Tottenham Hotspur':'تاتنهام','Tottenham':'تاتنهام',
+  'Newcastle United':'نیوکاسل','Aston Villa':'استون ویلا','West Ham United':'وستهام',
+  'Brighton & Hove Albion':'برایتون','Everton':'اورتون','Nottingham Forest':'ناتینگهام فارست',
+  'Bayern Munich':'بایرن مونیخ','FC Bayern Munich':'بایرن مونیخ','Borussia Dortmund':'دورتموند',
+  'RB Leipzig':'لایپزیش','Bayer Leverkusen':'لورکوزن','Eintracht Frankfurt':'آینتراخت فرانکفورت',
+  'VfB Stuttgart':'اشتوتگارت','Borussia Monchengladbach':'مونشن‌گلادباخ',
+  'Borussia Mönchengladbach':'مونشن‌گلادباخ','Werder Bremen':'وردربرمن','Hamburger SV':'هامبورگ',
+  'FC Koln':'کلن','1. FC Köln':'کلن','Union Berlin':'یونیون برلین','Wolfsburg':'ولفسبورگ',
+  'Juventus':'یوونتوس','Inter Milan':'اینتر','Internazionale':'اینتر','AC Milan':'آث میلان',
+  'Napoli':'ناپولی','AS Roma':'آاس رم','Roma':'آاس رم','Lazio':'لاتزیو','Atalanta':'آتالانتا',
+  'Fiorentina':'فیورنتینا','Bologna':'بولونیا','Torino':'تورینو',
+  'Paris Saint-Germain':'پاری‌سن‌ژرمن','PSG':'پاری‌سن‌ژرمن','Marseille':'مارسی',
+  'Olympique Marseille':'مارسی','Lyon':'لیون','Olympique Lyonnais':'لیون','Monaco':'موناکو',
+  'AS Monaco':'موناکو','Lille':'لیل','Nice':'نیس','Lens':'لانس','RC Lens':'لانس',
+  'Ajax':'آژاکس','PSV Eindhoven':'پی‌اس‌وی','PSV':'پی‌اس‌وی','Feyenoord':'فاینورد',
+  'Benfica':'بنفیکا','Porto':'پورتو','FC Porto':'پورتو','Sporting CP':'اسپورتینگ لیسبون',
+  'Celtic':'سلتیک','Rangers':'رنجرز','Galatasaray':'گالاتاسرای','Fenerbahce':'فنرباغچه',
+  'Fenerbahçe':'فنرباغچه','Besiktas':'بشیکتاش','Beşiktaş':'بشیکتاش',
+  'Red Bull Salzburg':'ردبول زالتسبورگ','Shakhtar Donetsk':'شاختار دونتسک',
+  'Club Brugge':'کلوب بروژ','Copenhagen':'کپنهاگ','Young Boys':'یانگ بویز'
+};
+const faTeam = n => FA[n] || n;
+
+/* ---- Persian digits ---- */
+const faNum = s => String(s).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+
+/* ---- status translation ---- */
+const STATUS_LIVE = ['1H','2H','ET','BT','P','HT','LIVE','INT'];
+function statusLabel(st, elapsed, extra){
+  const map = {
+    '1H':'نیمه اول','2H':'نیمه دوم','HT':'بین دو نیمه','ET':'وقت اضافه',
+    'BT':'استراحت وقت اضافه','P':'ضربات پنالتی','FT':'پایان بازی',
+    'AET':'پایان (وقت اضافه)','PEN':'پایان (پنالتی)','NS':'شروع نشده',
+    'SUSP':'متوقف شده','INT':'وقفه','PST':'به تعویق افتاد','CANC':'لغو شد',
+    'TBD':'نامشخص','LIVE':'زنده'
+  };
+  let label = map[st] || st;
+  if (elapsed && STATUS_LIVE.includes(st) && st!=='HT' && st!=='P' && st!=='BT'){
+    label = 'دقیقه ' + faNum(elapsed) + (extra ? '+' + faNum(extra) : '') + ' · ' + label;
+  }
+  return label;
+}
+
+/* ---- event rendering ---- */
+function evIcon(ev){
+  const t = (ev.type||'').toLowerCase();
+  const d = (ev.detail||'').toLowerCase();
+  if (t==='goal'){
+    if (d.includes('own')) return '⚽';
+    if (d.includes('penalty') && d.includes('missed')) return '❌';
+    return '⚽';
+  }
+  if (t==='card') return d.includes('red') ? '🟥' : '🟨';
+  if (t==='subst') return '🔄';
+  if (t==='var') return '📺';
+  return '•';
+}
+function evClass(ev){
+  const t=(ev.type||'').toLowerCase(), d=(ev.detail||'').toLowerCase();
+  if (t==='goal') return 'ev goal';
+  if (t==='card' && d.includes('red')) return 'ev redcard';
+  return 'ev';
+}
+function evText(ev){
+  const t=(ev.type||'').toLowerCase(), d=(ev.detail||'').toLowerCase();
+  const player = ev.player?.name || '؟';
+  const assist = ev.assist?.name;
+  if (t==='goal'){
+    let kind = 'گل!';
+    if (d.includes('own')) kind = 'گل به خودی!';
+    else if (d.includes('penalty') && d.includes('missed')) kind = 'پنالتی از دست رفت';
+    else if (d.includes('penalty')) kind = 'گل از روی نقطه پنالتی!';
+    let txt = `<span class="who">${kind} ${player}</span>`;
+    if (assist && !d.includes('own')) txt += ` <span class="sub">(پاس گل: ${assist})</span>`;
+    return txt;
+  }
+  if (t==='card'){
+    const c = d.includes('red') ? 'کارت قرمز' : 'کارت زرد';
+    return `<span class="who">${c}</span> برای ${player}`;
+  }
+  if (t==='subst'){
+    return `<span class="who">تعویض:</span> ${assist||'؟'} وارد شد <span class="sub">(به‌جای ${player})</span>`;
+  }
+  if (t==='var'){
+    return `<span class="who">بررسی VAR</span> <span class="sub">${ev.detail||''}</span>`;
+  }
+  return `${ev.type||''} – ${player}`;
+}
+
+/* ---- match card ---- */
+function renderMatch(fx){
+  const st = fx.fixture.status.short;
+  const isLive = STATUS_LIVE.includes(st);
+  const home = fx.teams.home, away = fx.teams.away;
+  const gh = fx.goals.home, ga = fx.goals.away;
+  const kickoff = new Date(fx.fixture.date);
+  const timeStr = faNum(kickoff.toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'}));
+  const round = fx.league?.round || '';
+  const roundFa = round
+    .replace('Quarter-finals','یک‌چهارم نهایی')
+    .replace('Semi-finals','نیمه‌نهایی')
+    .replace('Round of 16','یک‌هشتم نهایی')
+    .replace('Round of 32','یک‌شانزدهم نهایی')
+    .replace('3rd Place Final','رده‌بندی')
+    .replace('Final','فینال');
+
+  let topRight = isLive
+    ? `<span class="badge-live">زنده</span>`
+    : `<span>${st==='NS' ? 'ساعت ' + timeStr : ''}</span>`;
+
+  const score = (gh===null||ga===null)
+    ? '– : –'
+    : `${faNum(gh)} : ${faNum(ga)}`;
+
+  let pens = '';
+  if (fx.score?.penalty?.home!=null && fx.score?.penalty?.away!=null){
+    pens = `<div class="pens">پنالتی: ${faNum(fx.score.penalty.home)} – ${faNum(fx.score.penalty.away)}</div>`;
+  }
+
+  const evs = (fx.events||[]);
+  let evHtml = '';
+  if (evs.length){
+    evHtml = '<div class="events">' + evs.map(ev => `
+      <div class="${evClass(ev)}">
+        <span class="m">${faNum(ev.time?.elapsed ?? '')}${ev.time?.extra?'+'+faNum(ev.time.extra):''}′</span>
+        <span class="ico">${evIcon(ev)}</span>
+        <span class="txt">${evText(ev)}<div class="ev-team">${faTeam(ev.team?.name||'')}</div></span>
+      </div>`).join('') + '</div>';
+  } else if (isLive){
+    evHtml = '<div class="events"><div class="noev">هنوز رویدادی ثبت نشده</div></div>';
+  }
+
+  return `
+  <article class="match ${isLive?'is-live':''}">
+    <div class="match-top">
+      <span>${roundFa}</span>
+      ${topRight}
+    </div>
+    <div class="scoreline">
+      <div class="team">
+        <img src="${home.logo}" alt="" loading="lazy">
+        <span class="tname">${faTeam(home.name)}</span>
+      </div>
+      <div class="score">${score}</div>
+      <div class="team">
+        <img src="${away.logo}" alt="" loading="lazy">
+        <span class="tname">${faTeam(away.name)}</span>
+      </div>
+    </div>
+    <div class="minute ${isLive?'':'ft'}">${statusLabel(st, fx.fixture.status.elapsed, fx.fixture.status.extra)}</div>
+    ${pens}
+    ${evHtml}
+  </article>`;
+}
+
+/* ---- load & render ---- */
+async function load(){
+  try{
+    const res = await fetch(`${API}?day=${currentDay}&league=${currentLeague}`, {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const list = data.response || [];
+    const app = document.getElementById('app');
+    if(!list.length){
+      app.innerHTML = '<div class="notice">در این روز بازی‌ای برگزار نمی‌شود.</div>';
+    } else {
+      // live matches first, then upcoming by time, then finished
+      list.sort((a,b)=>{
+        const la = STATUS_LIVE.includes(a.fixture.status.short)?0:(a.fixture.status.short==='NS'?1:2);
+        const lb = STATUS_LIVE.includes(b.fixture.status.short)?0:(b.fixture.status.short==='NS'?1:2);
+        if(la!==lb) return la-lb;
+        return new Date(a.fixture.date)-new Date(b.fixture.date);
+      });
+      app.innerHTML = list.map(renderMatch).join('');
+    }
+    const now = new Date();
+    document.getElementById('updated').textContent =
+      'آخرین به‌روزرسانی: ' + faNum(now.toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}));
+  }catch(e){
+    document.getElementById('app').innerHTML =
+      `<div class="notice"><strong>خطا در دریافت اطلاعات.</strong><br>
+       لطفاً بررسی کنید مسیر <code>/api/worldcup</code> در Cloudflare Worker فعال و کلید API تنظیم شده باشد.</div>`;
+    document.getElementById('updated').textContent = 'اتصال برقرار نشد';
+  }
+}
+
+/* ---- league tabs ---- */
+document.getElementById('leaguebar').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('#leaguebar button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentLeague = btn.dataset.league;
+  document.getElementById('pageTitle').innerHTML = LEAGUE_TITLES[currentLeague] || 'نتایج زنده';
+  document.getElementById('app').innerHTML = '<div class="notice">در حال بارگذاری…</div>';
+  load();
+});
+
+/* ---- day tabs ---- */
+document.getElementById('daybar').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('.daybar button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentDay = btn.dataset.day;
+  document.getElementById('app').innerHTML = '<div class="notice">در حال بارگذاری…</div>';
+  load();
+});
+
+/* ---- auto refresh (only when tab visible) ---- */
+function startTimer(){
+  clearInterval(timer);
+  timer = setInterval(()=>{ if(!document.hidden) load(); }, REFRESH_MS);
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) load(); });
+
+load();
+startTimer();
+</script>
+</body>
+</html>

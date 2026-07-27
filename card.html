@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ساخت کارت خبری — پالس ایران ۲۴</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0D1117;--panel:#161B22;--line:#232B36;--red:#D7263D;--gold:#C9A227;--text:#E6EDF3;--muted:#8B949E}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--ink);color:var(--text);font-family:Vazirmatn,-apple-system,"Segoe UI",Tahoma,sans-serif;
+ line-height:1.7;padding:22px 14px 70px}
+.wrap{max-width:1120px;margin:0 auto}
+header{border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:24px}
+.eyebrow{font-size:12px;letter-spacing:.14em;color:var(--gold);display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.eyebrow::before{content:"";width:26px;height:2px;background:var(--red);display:block}
+h1{font-size:clamp(21px,4vw,29px);font-weight:900;margin:0}
+.sub{color:var(--muted);font-size:13.5px;margin:5px 0 0}
+
+.grid{display:grid;grid-template-columns:1fr;gap:20px}
+@media(min-width:900px){.grid{grid-template-columns:370px 1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.panel h2{font-size:12px;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;font-weight:500}
+
+label.lbl{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin:16px 0 7px}
+label.lbl b{color:var(--text);font-weight:500}
+input[type=text],textarea,select{width:100%;background:#0E141B;border:1px solid var(--line);color:var(--text);
+ border-radius:9px;padding:10px 12px;font-family:inherit;font-size:14.5px;line-height:1.8}
+textarea{resize:vertical;min-height:92px}
+input[type=range]{width:100%;accent-color:var(--red)}
+.first{margin-top:0}
+
+#drop{border:2px dashed var(--line);border-radius:11px;padding:20px 14px;text-align:center;cursor:pointer;
+ transition:border-color .18s,background .18s;margin-top:6px}
+#drop:hover,#drop.hot{border-color:var(--red);background:rgba(215,38,61,.06)}
+#drop strong{display:block;font-size:14px;margin-bottom:3px}
+#drop span{color:var(--muted);font-size:12px}
+input[type=file]{display:none}
+
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;
+ padding:8px 13px;font-family:inherit;font-size:13px;cursor:pointer;transition:.15s}
+.chip:hover{color:var(--text)}
+.chip[aria-pressed=true]{border-color:var(--gold);color:var(--text);background:rgba(201,162,39,.08)}
+
+.stageWrap{display:flex;justify-content:center}
+#stage{max-width:100%;border-radius:10px;border:1px solid var(--line);display:block;
+ background:#000;height:auto}
+
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;justify-content:center}
+button.act{font-family:inherit;font-size:14.5px;font-weight:700;border:0;border-radius:10px;padding:12px 22px;
+ cursor:pointer;transition:filter .15s,transform .12s}
+button.act:hover:not(:disabled){filter:brightness(1.12);transform:translateY(-1px)}
+button.act:disabled{opacity:.4;cursor:not-allowed}
+.primary{background:var(--red);color:#fff}
+.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.warn{font-size:12.5px;color:var(--gold);margin-top:12px;display:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,#drop:focus-visible{
+ outline:2px solid var(--gold);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">ابزار داخلی</div>
+  <h1>ساخت کارت خبری</h1>
+  <p class="sub">تیتر را بنویس، عکس را بگذار، کارت را دانلود کن. لوگو و امضا خودکار روی کارت می‌نشینند.</p>
+</header>
+
+<div class="grid">
+
+  <div class="panel">
+    <h2>محتوا</h2>
+
+    <label class="lbl first">سرخط <b id="kickerC"></b></label>
+    <input type="text" id="kicker" value="خبر فوری" maxlength="28">
+
+    <label class="lbl">تیتر <b id="titleC">۰</b></label>
+    <textarea id="title" maxlength="150">تیتر خبر را اینجا بنویس</textarea>
+
+    <label class="lbl">زیرنویس — اختیاری</label>
+    <input type="text" id="dek" maxlength="90" placeholder="یک جمله‌ی توضیحی">
+
+    <label class="lbl">منبع — اختیاری</label>
+    <input type="text" id="src" maxlength="40" placeholder="مثلاً: رویترز">
+
+    <h2 style="margin-top:26px">تصویر</h2>
+    <div id="drop" tabindex="0" role="button">
+      <strong>عکس خبر را بکش اینجا</strong>
+      <span>یا کلیک کن</span>
+    </div>
+    <input type="file" id="file" accept="image/*">
+
+    <label class="lbl">تیرگی روی عکس <b id="dimC">۶۰٪</b></label>
+    <input type="range" id="dim" min="20" max="90" value="60">
+
+    <h2 style="margin-top:26px">قالب</h2>
+    <label class="lbl first">اندازه</label>
+    <div class="chips" id="sizes">
+      <button class="chip" data-w="1080" data-h="1080" aria-pressed="true">مربع ۱۰۸۰</button>
+      <button class="chip" data-w="1080" data-h="1350" aria-pressed="false">عمودی</button>
+      <button class="chip" data-w="1920" data-h="1080" aria-pressed="false">افقی</button>
+    </div>
+
+    <label class="lbl">جای لوگو</label>
+    <div class="chips" id="corners">
+      <button class="chip" data-c="tr" aria-pressed="true">بالا راست</button>
+      <button class="chip" data-c="tl" aria-pressed="false">بالا چپ</button>
+      <button class="chip" data-c="br" aria-pressed="false">پایین راست</button>
+      <button class="chip" data-c="bl" aria-pressed="false">پایین چپ</button>
+    </div>
+
+    <label class="lbl">اندازه‌ی لوگو <b id="lsC">۱۰۰٪</b></label>
+    <input type="range" id="ls" min="50" max="180" value="100">
+
+    <div class="warn" id="warn">لوگو پیدا نشد. این ابزار باید از روی سایت باز شود تا لوگو را از <b>/logo.png</b> بردارد.</div>
+  </div>
+
+  <div class="panel">
+    <h2>پیش‌نمایش</h2>
+    <div class="stageWrap"><canvas id="stage" width="1080" height="1080"></canvas></div>
+    <div class="actions">
+      <button class="act primary" id="dl">دانلود کارت</button>
+      <button class="act ghost" id="clear">حذف عکس</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+  var cv=document.getElementById('stage'),ctx=cv.getContext('2d');
+  var W=1080,H=1080,photo=null,logo=null,corner='tr';
+  var $=function(id){return document.getElementById(id)};
+
+  function fa(n){return String(n).replace(/[0-9]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'[d]})}
+
+  // logo comes from the site root, no upload needed
+  var li=new Image(); li.crossOrigin='anonymous';
+  li.onload=function(){logo=li;draw()};
+  li.onerror=function(){$('warn').style.display='block'};
+  li.src='/logo.png';
+
+  function wrap(text,maxW){
+    var words=text.split(/\s+/),lines=[],cur='';
+    for(var i=0;i<words.length;i++){
+      var t=cur?cur+' '+words[i]:words[i];
+      if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=words[i];}
+      else cur=t;
+    }
+    if(cur)lines.push(cur);
+    return lines;
+  }
+
+  function draw(){
+    var k=W/1080, M=Math.round(78*k);
+    cv.width=W;cv.height=H;
+    ctx.direction='rtl';ctx.textAlign='right';
+
+    // background
+    ctx.fillStyle='#0D1117';ctx.fillRect(0,0,W,H);
+    if(photo){
+      var s=Math.max(W/photo.width,H/photo.height);
+      var w=photo.width*s,h=photo.height*s;
+      ctx.drawImage(photo,(W-w)/2,(H-h)/2,w,h);
+    }
+    // scrim so text always reads
+    var d=$('dim').value/100;
+    var g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'rgba(8,11,15,'+(d*0.55)+')');
+    g.addColorStop(0.42,'rgba(8,11,15,'+(d*0.62)+')');
+    g.addColorStop(1,'rgba(8,11,15,'+Math.min(d+0.28,0.97)+')');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+    var sig=Math.round(40*k);                 // signature strip height
+    var y=H-M-sig;                            // text baseline stack grows upward
+
+    // source
+    var src=$('src').value.trim();
+    if(src){
+      ctx.font='500 '+Math.round(28*k)+'px Vazirmatn, sans-serif';
+      ctx.fillStyle='rgba(230,237,243,.62)';
+      ctx.fillText('منبع: '+src,W-M,y);
+      y-=Math.round(48*k);
+    }
+    // dek
+    var dek=$('dek').value.trim();
+    if(dek){
+      ctx.font='400 '+Math.round(34*k)+'px Vazirmatn, sans-serif';
+      ctx.fillStyle='rgba(230,237,243,.82)';
+      var dl=wrap(dek,W-M*2);
+      for(var i=dl.length-1;i>=0;i--){ctx.fillText(dl[i],W-M,y);y-=Math.round(52*k);}
+      y-=Math.round(10*k);
+    }
+    // headline
+    var fs=Math.round((H>W?64:58)*k);
+    ctx.font='900 '+fs+'px Vazirmatn, sans-serif';
+    ctx.fillStyle='#fff';
+    var lines=wrap($('title').value.trim(),W-M*2);
+    var lh=Math.round(fs*1.52);
+    for(var j=lines.length-1;j>=0;j--){ctx.fillText(lines[j],W-M,y);y-=lh;}
+
+    // kicker with red bar
+    var kick=$('kicker').value.trim();
+    if(kick){
+      y-=Math.round(14*k);
+      ctx.font='700 '+Math.round(30*k)+'px Vazirmatn, sans-serif';
+      var tw=ctx.measureText(kick).width;
+      var bh=Math.round(52*k),bw=tw+Math.round(46*k);
+      ctx.fillStyle='#D7263D';
+      ctx.fillRect(W-M-bw,y-bh+Math.round(14*k),bw,bh);
+      ctx.fillStyle='#fff';
+      ctx.fillText(kick,W-M-Math.round(23*k),y);
+    }
+
+    // signature
+    ctx.font='500 '+Math.round(27*k)+'px Vazirmatn, sans-serif';
+    ctx.fillStyle='rgba(230,237,243,.55)';
+    ctx.fillText('@pulseiran24  |  pulseiran24.com',W-M,H-M+Math.round(16*k));
+
+    // logo
+    if(logo){
+      var lw=Math.round(150*k*($('ls').value/100));
+      var lh2=lw*logo.height/logo.width;
+      var x=(corner==='tr'||corner==='br')?W-M-lw:M;
+      var ly=(corner==='tr'||corner==='tl')?M-Math.round(18*k):H-M-lh2-Math.round(56*k);
+      ctx.drawImage(logo,x,ly,lw,lh2);
+    }
+  }
+
+  function loadPhoto(f){
+    if(!f||f.type.indexOf('image')!==0)return;
+    var r=new FileReader();
+    r.onload=function(e){var i=new Image();i.onload=function(){photo=i;draw()};i.src=e.target.result};
+    r.readAsDataURL(f);
+  }
+
+  var drop=$('drop');
+  drop.addEventListener('click',function(){$('file').click()});
+  drop.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}});
+  ['dragenter','dragover'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();this.classList.add('hot')})});
+  ['dragleave','drop'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();this.classList.remove('hot')})});
+  drop.addEventListener('drop',function(e){loadPhoto(e.dataTransfer.files[0])});
+  $('file').addEventListener('change',function(e){loadPhoto(e.target.files[0])});
+
+  ['kicker','title','dek','src'].forEach(function(id){$(id).addEventListener('input',draw)});
+  $('title').addEventListener('input',function(){$('titleC').textContent=fa(this.value.length)});
+  $('dim').addEventListener('input',function(){$('dimC').textContent=fa(this.value)+'٪';draw()});
+  $('ls').addEventListener('input',function(){$('lsC').textContent=fa(this.value)+'٪';draw()});
+
+  $('sizes').addEventListener('click',function(e){
+    var b=e.target.closest('.chip');if(!b)return;
+    this.querySelectorAll('.chip').forEach(function(c){c.setAttribute('aria-pressed','false')});
+    b.setAttribute('aria-pressed','true');
+    W=+b.dataset.w;H=+b.dataset.h;draw();
+  });
+  $('corners').addEventListener('click',function(e){
+    var b=e.target.closest('.chip');if(!b)return;
+    this.querySelectorAll('.chip').forEach(function(c){c.setAttribute('aria-pressed','false')});
+    b.setAttribute('aria-pressed','true');
+    corner=b.dataset.c;draw();
+  });
+
+  $('clear').addEventListener('click',function(){photo=null;draw()});
+  $('dl').addEventListener('click',function(){
+    var a=document.createElement('a');
+    a.download='pulseiran24-card-'+Date.now()+'.png';
+    try{a.href=cv.toDataURL('image/png');a.click();}
+    catch(err){alert('برای دانلود، این صفحه را از روی سایت باز کن، نه از روی فایل محلی.');}
+  });
+
+  $('titleC').textContent=fa($('title').value.length);
+  if(document.fonts&&document.fonts.ready){document.fonts.ready.then(draw)}
+  draw();
+})();
+</script>
+</body>
+</html>
