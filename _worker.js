@@ -64,7 +64,12 @@ export default {
       return handleHome(request, env, ctx, "de");
     }
 
-    return env.ASSETS.fetch(request);
+   
+   if (path === "/tahlil" || path === "/tahlil/") return handleTahlilList(url, env);
+    if (path === "/tahlil.xml") return handleTahlilFeed(env);
+    if (path === "/tahlil-admin" || path === "/tahlil-admin/") return handleTahlilAdminPage();
+    if (path === "/tahlil-admin/api") return handleTahlilAdminApi(request, env);
+    if (/^\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPage(url, env, path.split("/")[2]); return env.ASSETS.fetch(request);
   }
 };
 
@@ -1770,6 +1775,7 @@ async function handleSitemap(url, env) {
   for (const p of ["darbare.html", "khatte-mashy.html", "tashih.html"]) {
     urls.push(`  <url><loc>${SITE_ORIGIN}/${p}</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>`);
   }
+  for (const u of await tahlilSitemapUrls(env)) urls.push(u);
   for (const it of index.slice(0, 2000)) {
     const id = String(it.id || "").replace(/[^0-9]/g, "");
     if (!id) continue;
@@ -1984,3 +1990,737 @@ async function handlePressNews() {
     headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=600" }
   });
 }
+
+
+/* ============================================================================
+   پالس ایران ۲۴ — بخش «تحلیل صوتی»  (v78)
+   ----------------------------------------------------------------------------
+   این کد برای همان _worker.js فعلی (v77) نوشته شده و از توابع خودِ آن استفاده
+   می‌کند (escHtml, xmlEsc, formatFaDate, textToParagraphs, notFoundArticlePage,
+   checkAdmin, adminJson, sendPush, SITE_ORIGIN). هیچ متغیر تکراری تعریف نمی‌کند.
+
+   ── گام ۱: کل این فایل را عیناً به انتهای _worker.js اضافه کن (append).
+
+   ── گام ۲: در تابع fetch، درست *بالای* این خط:
+
+        return env.ASSETS.fetch(request);
+
+      این پنج خط را اضافه کن:
+
+        if (path === "/tahlil" || path === "/tahlil/") return handleTahlilList(url, env);
+        if (path === "/tahlil.xml") return handleTahlilFeed(env);
+        if (path === "/tahlil-admin" || path === "/tahlil-admin/") return handleTahlilAdminPage();
+        if (path === "/tahlil-admin/api") return handleTahlilAdminApi(request, env);
+        if (/^\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPage(url, env, path.split("/")[2]);
+
+   ── گام ۳ (اختیاری، برای سئو): در تابع handleSitemap، بلافاصله بعد از حلقه‌ی
+      darbare/khatte-mashy/tashih این دو خط را بگذار:
+
+        for (const u of await tahlilSitemapUrls(env)) urls.push(u);
+
+   ── گام ۴ (اختیاری): در خط اول _worker.js عدد v77 را به v78 تغییر بده تا
+      بدانی کدام نسخه بالاست. فقط همان عدد را عوض کن، به بقیه‌ی خط دست نزن.
+
+   ── استفاده:
+      ۱) فایل mp3 را در assets/audio/ داخل ریپو گیت‌هاب بگذار
+         (مونو، ۶۴ تا ۹۶ کیلوبیت؛ ۱۰ دقیقه ≈ ۶ مگابایت، سقف Pages ۲۵ مگابایت
+          یعنی تا حدود ۴۰ دقیقه صدا هم جا می‌شود).
+         مدت را می‌توانی «۶۰۰» یا «10:00» بنویسی — هر دو قبول است.
+         برای قطعه‌های بلند: دکمه‌های ۱۵ ثانیه جلو/عقب و «ادامه از …» فعال است
+         و متن کامل تا ۶۰ هزار کاراکتر (حدود ۷۰ دقیقه گفتار) پشتیبانی می‌شود.
+      ۲) به /tahlil-admin برو، با همان ADMIN_TOKEN وارد شو، عنوان و آدرس فایل و
+         متن کامل را بگذار و منتشر کن. اعلان وب‌پوش هم مثل پنل خبر کار می‌کند.
+      ۳) فید پادکست روی /tahlil.xml آماده است (برای اسپاتیفای/اپل در آینده).
+
+   ── سه چیز جدا که خودت تعیین می‌کنی:
+      • عنوان        → تیتری که بالای صفحه دیده می‌شود
+      • شناسه        → آدرس صفحه، مثل /tahlil/1405-05-05
+      • نام نمایشی   → نامی که زیر پلیر نشان داده می‌شود و فایل با همان
+                       نام دانلود می‌شود (فارسی هم مجاز است). خالی بگذاری،
+                       خودش از روی عنوان ساخته می‌شود.
+      نام واقعی فایل روی سرور (assets/audio/…) می‌تواند کاملاً متفاوت باشد.
+
+   نکته: برای دیده‌شدن بخش در صفحه‌ی اصلی، یک لینک به /tahlil در منوی
+   index.html اضافه کن — این فایل به index.html دست نمی‌زند.
+   ============================================================================ */
+
+/* ============================================================
+   تحلیل صوتی — build v78
+   ------------------------------------------------------------
+   مسیرها:
+     /tahlil              فهرست تحلیل‌های صوتی
+     /tahlil/{id}         صفحه‌ی هر تحلیل (پلیر + متن کامل + AudioObject)
+     /tahlil.xml          فید پادکست (برای اسپاتیفای/اپل در آینده)
+     /tahlil-admin        پنل انتشار (همان ADMIN_TOKEN فعلی)
+   ذخیره در KV (همان PULSE_STATS):
+     tahlil:{id}          خود تحلیل
+     tahlil_index         فهرست برای صفحه‌ی /tahlil و sitemap
+   فایل صوتی: assets/audio/*.mp3 در ریپو گیت‌هاب
+   از توابع موجود همین ورکر استفاده می‌کند:
+     escHtml, xmlEsc, formatFaDate, textToParagraphs,
+     notFoundArticlePage, checkAdmin, adminJson, sendPush,
+     JSON_HEADERS, SITE_ORIGIN
+   ============================================================ */
+
+const TAHLIL_CAP = 300;
+
+async function getTahlilIndex(env) {
+  const kv = env && env.PULSE_STATS;
+  if (!kv) return [];
+  try {
+    const raw = await kv.get("tahlil_index");
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+/* مدت را هم به ثانیه («۶۰۰») و هم به شکل «۱۰:۰۰» یا «۱:۰۲:۳۰» می‌پذیرد */
+function parseTahlilDuration(v) {
+  const raw = String(v == null ? "" : v)
+    .replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))
+    .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
+    .trim();
+  if (!raw) return 0;
+  if (raw.indexOf(":") !== -1) {
+    const parts = raw.split(":").map(x => parseInt(x, 10) || 0);
+    while (parts.length < 3) parts.unshift(0);
+    return Math.max(0, parts[0] * 3600 + parts[1] * 60 + parts[2]);
+  }
+  return Math.max(0, parseInt(raw, 10) || 0);
+}
+
+function tahlilIsoDuration(sec) {
+  const s = Math.max(0, parseInt(sec, 10) || 0);
+  const h = Math.floor(s / 3600);
+  return "PT" + (h ? h + "H" : "") + Math.floor((s % 3600) / 60) + "M" + (s % 60) + "S";
+}
+
+function tahlilClock(sec) {
+  const s = Math.max(0, parseInt(sec, 10) || 0);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return h ? (h + ":" + String(m).padStart(2, "0") + ":" + ss) : (m + ":" + ss);
+}
+
+/* ---------- استایل مشترک (هماهنگ با صفحه‌ی خبر) ---------- */
+
+const TAHLIL_CSS = `
+  :root{--bg:#0D1117;--surface:#161C26;--line:#2A3442;--text:#E9EDF2;--dim:#8B96A5;--pulse:#FF2D4A;--tg:#2AABEE}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Vazirmatn',Tahoma,sans-serif;background:var(--bg);color:var(--text);line-height:1.85}
+  a{color:inherit}
+  .wrap{max-width:760px;margin:0 auto;padding:0 20px}
+  header{border-bottom:1px solid var(--line);padding:16px 0;margin-bottom:26px}
+  header .wrap{display:flex;align-items:center;gap:10px}
+  header a.logo{font-weight:900;font-size:1.2rem;text-decoration:none;display:flex;align-items:center;gap:8px}
+  header a.logo img{width:34px;height:34px;border-radius:8px;object-fit:cover;display:block}
+  header a.logo b{color:var(--pulse)}
+  .art-meta{color:var(--dim);font-size:.88rem;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .art-meta .badge{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 11px;color:var(--pulse);font-weight:700}
+  h1{font-size:1.55rem;font-weight:900;line-height:1.5;margin:0 0 14px}
+  .lede{color:var(--dim);font-size:1.02rem;margin:0 0 22px}
+  /* پلیر: خط ضربان برند به‌جای نوار پیشرفت */
+  .player{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 16px 12px;margin-bottom:26px}
+  .prow{display:flex;align-items:center;gap:14px}
+  .playbtn{flex:0 0 auto;width:52px;height:52px;border-radius:50%;border:0;background:var(--pulse);
+    color:#fff;font-size:1.05rem;cursor:pointer;display:grid;place-items:center;transition:transform .15s}
+  .playbtn:hover{transform:scale(1.06)}
+  .playbtn:focus-visible{outline:3px solid var(--text);outline-offset:3px}
+  .track{position:relative;flex:1;height:36px;cursor:pointer}
+  .track svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;transform:scaleX(-1)}
+  .base{stroke:var(--line);stroke-width:2;fill:none;stroke-linecap:round}
+  .prog{stroke:var(--pulse);stroke-width:2.6;fill:none;stroke-linecap:round;
+    stroke-dasharray:1000;stroke-dashoffset:1000}
+  .tm{font-variant-numeric:tabular-nums;color:var(--dim);font-size:.85rem;flex:0 0 auto;
+    min-width:88px;text-align:left;direction:ltr}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .chip{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:999px;
+    padding:5px 13px;font-size:.82rem;cursor:pointer;font-family:inherit}
+  .chip[aria-pressed="true"]{background:rgba(255,45,74,.12);color:var(--pulse);border-color:var(--pulse)}
+  .fname{color:var(--dim);font-size:.78rem;margin-top:10px;unicode-bidi:plaintext}
+  h2{font-size:1.05rem;margin:34px 0 4px;font-weight:800}
+  .hint{color:var(--dim);font-size:.82rem;margin:0 0 14px}
+  .art-body p{margin:0 0 14px;font-size:1.03rem;color:#dbe1e8}
+  .srcs{margin-top:30px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;color:var(--dim);font-size:.86rem}
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin:26px 0;padding-top:20px;border-top:1px solid var(--line)}
+  .actions a{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:10px;
+    padding:9px 16px;font-size:.9rem;font-weight:600;text-decoration:none}
+  .actions a.wa:hover{background:#25D366;border-color:#25D366;color:#fff}
+  .actions a.tg:hover{background:var(--tg);border-color:var(--tg);color:#fff}
+  .actions a.x:hover{background:#000;border-color:#000;color:#fff}
+  .tlist{list-style:none;padding:0;margin:22px 0 0}
+  .tlist li{border-top:1px solid var(--line)}
+  .tlist li:first-child{border-top:0}
+  .tlist a{display:flex;justify-content:space-between;gap:16px;padding:16px 2px;text-decoration:none}
+  .tlist a:hover strong{color:var(--pulse)}
+  .tlist strong{font-weight:600;font-size:1rem}
+  .tlist span{color:var(--dim);font-size:.8rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .empty{color:var(--dim)}
+  .home-link{display:block;margin:22px 0 40px;color:var(--pulse);font-weight:700;text-decoration:none}
+  footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0;color:var(--dim);font-size:.85rem;text-align:center}
+  footer a{color:var(--tg);text-decoration:none}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+`;
+
+const TAHLIL_HEADER = `<header><div class="wrap">
+  <a class="logo" href="/"><img src="/assets/icon-192.png" alt="" onerror="this.style.display='none'">پالس <b>ایران ۲۴</b></a>
+</div></header>`;
+
+const TAHLIL_FOOTER = `<footer>پالس ایران ۲۴ — نبض خبر ایران و جهان · <a href="https://telegram.me/pulseiran24" target="_blank" rel="noopener">کانال تلگرام</a></footer>`;
+
+const TAHLIL_FONT = `<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">`;
+
+/* ---------- صفحه‌ی یک تحلیل ---------- */
+
+async function handleTahlilPage(url, env, id) {
+  const kv = env && env.PULSE_STATS;
+  if (!kv) return notFoundArticlePage();
+
+  let t = null;
+  try {
+    const raw = await kv.get("tahlil:" + id);
+    if (raw) t = JSON.parse(raw);
+  } catch (e) {}
+  if (!t) return notFoundArticlePage();
+
+  const origin = url.origin;
+  const canonical = origin + "/tahlil/" + id;
+  const audioAbs = /^https?:\/\//.test(t.audio) ? t.audio : origin + t.audio;
+  const cover = t.image || "/assets/og-image.jpg";
+  const coverAbs = /^https?:\/\//.test(cover) ? cover : origin + cover;
+
+  let description = String(t.summary || t.title || "").replace(/\s+/g, " ").trim();
+  if (description.length > 160) description = description.slice(0, 157) + "…";
+
+  /* نام فایل هنگام دانلود و نمایش زیر پلیر — اگر خالی باشد از عنوان ساخته می‌شود */
+  const dlName = (t.filename && t.filename.trim())
+    ? t.filename.trim()
+    : (String(t.title).replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 80) + ".mp3");
+
+  const paragraphs = textToParagraphs(t.transcript || "");
+  const bodyHtml = paragraphs.map(p => "<p>" + escHtml(p) + "</p>").join("\n");
+
+  const waShare = "https://wa.me/?text=" + encodeURIComponent(t.title + "\n" + canonical + "\n\n📡 Pulse Iran 24 | https://pulseiran24.com");
+  const tgShare = "https://t.me/share/url?url=" + encodeURIComponent(canonical) + "&text=" + encodeURIComponent(t.title);
+  const xShare = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(t.title) + "&url=" + encodeURIComponent(canonical);
+
+  const ld = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "AudioObject",
+    "name": t.title,
+    "description": description,
+    "contentUrl": audioAbs,
+    "encodingFormat": "audio/mpeg",
+    "duration": tahlilIsoDuration(t.duration),
+    "uploadDate": t.date,
+    "datePublished": t.date,
+    "inLanguage": "fa-IR",
+    "url": canonical,
+    "thumbnailUrl": coverAbs,
+    "transcript": t.transcript || undefined,
+    "publisher": {
+      "@type": "NewsMediaOrganization",
+      "name": "Pulse Iran 24",
+      "url": SITE_ORIGIN,
+      "logo": { "@type": "ImageObject", "url": SITE_ORIGIN + "/assets/icon-512.png" }
+    }
+  }).replace(/</g, "\\u003c");
+
+  const html = `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escHtml(t.title)} | تحلیل صوتی پالس ایران ۲۴</title>
+<meta name="description" content="${escHtml(description)}">
+<link rel="canonical" href="${escHtml(canonical)}">
+<meta name="theme-color" content="#0D1117">
+<link rel="icon" href="/assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Pulse Iran 24">
+<meta property="og:title" content="${escHtml(t.title)}">
+<meta property="og:description" content="${escHtml(description)}">
+<meta property="og:url" content="${escHtml(canonical)}">
+<meta property="og:image" content="${escHtml(coverAbs)}">
+<meta property="og:audio" content="${escHtml(audioAbs)}">
+<meta property="og:locale" content="fa_IR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escHtml(t.title)}">
+<meta name="twitter:description" content="${escHtml(description)}">
+<meta name="twitter:image" content="${escHtml(coverAbs)}">
+${TAHLIL_FONT}
+<script type="application/ld+json">${ld}</script>
+<style>${TAHLIL_CSS}</style>
+</head>
+<body>
+${TAHLIL_HEADER}
+<main class="wrap">
+  <div class="art-meta">
+    <span class="badge">تحلیل صوتی</span>
+    <span>${escHtml(formatFaDate(t.date))}</span>
+    <span>زمان شنیدن: ${escHtml(tahlilClock(t.duration))}</span>
+  </div>
+  <h1>${escHtml(t.title)}</h1>
+  ${t.summary ? `<p class="lede">${escHtml(t.summary)}</p>` : ""}
+
+  <div class="player">
+    <audio id="au" src="${escHtml(t.audio)}" preload="metadata"></audio>
+    <div class="prow">
+      <button class="playbtn" id="pb" aria-label="پخش">▶</button>
+      <div class="track" id="tk" role="slider" tabindex="0" aria-label="جای‌یابی در فایل صوتی"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <svg viewBox="0 0 300 36" preserveAspectRatio="none" aria-hidden="true">
+          <path class="base" d="M0 18H112l8-12 11 24 9-12H300"/>
+          <path class="prog" id="pg" d="M0 18H112l8-12 11 24 9-12H300"/>
+        </svg>
+      </div>
+      <span class="tm" id="tm">0:00 / ${escHtml(tahlilClock(t.duration))}</span>
+    </div>
+    <div class="tools">
+      <button class="chip" id="rs" style="display:none"></button>
+      <button class="chip" id="bk">↺ ۱۵ ثانیه</button>
+      <button class="chip" id="fw">۱۵ ثانیه ↻</button>
+      <button class="chip" data-rate="1" aria-pressed="true">۱×</button>
+      <button class="chip" data-rate="1.25" aria-pressed="false">۱.۲۵×</button>
+      <button class="chip" data-rate="1.5" aria-pressed="false">۱.۵×</button>
+      <a class="chip" style="text-decoration:none" href="${escHtml(t.audio)}" download="${escHtml(dlName)}">دانلود صوت</a>
+    </div>
+    <div class="fname">🎧 ${escHtml(dlName)}</div>
+  </div>
+
+  ${bodyHtml ? `<h2>متن کامل</h2>
+  <p class="hint">همان متنی که در فایل صوتی خوانده شده است.</p>
+  <div class="art-body">${bodyHtml}</div>` : ""}
+
+  ${t.sources ? `<div class="srcs"><b>منابع:</b> ${escHtml(t.sources)}</div>` : ""}
+
+  <div class="actions">
+    <a class="wa" href="${escHtml(waShare)}" target="_blank" rel="noopener">واتساپ</a>
+    <a class="tg" href="${escHtml(tgShare)}" target="_blank" rel="noopener">تلگرام</a>
+    <a class="x" href="${escHtml(xShare)}" target="_blank" rel="noopener">X</a>
+  </div>
+  <a class="home-link" href="/tahlil">← همه‌ی تحلیل‌های صوتی</a>
+</main>
+${TAHLIL_FOOTER}
+<script>
+(function(){
+  var a=document.getElementById('au'),pb=document.getElementById('pb'),
+      pg=document.getElementById('pg'),tm=document.getElementById('tm'),
+      tk=document.getElementById('tk'),L=1000,total=${parseInt(t.duration, 10) || 0};
+  var ID=${JSON.stringify(String(id))},KEY='pi24_tahlil_'+ID;
+  function fmt(s){s=Math.max(0,Math.floor(s||0));
+    var h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=String(s%60).padStart(2,'0');
+    return h?(h+':'+String(m).padStart(2,'0')+':'+ss):(m+':'+ss);}
+  function dur(){return (isFinite(a.duration)&&a.duration)||total||0;}
+  function draw(){var d=dur(),r=d?a.currentTime/d:0;
+    pg.style.strokeDashoffset=String(L-L*r);
+    tm.textContent=fmt(a.currentTime)+' / '+fmt(d);
+    tk.setAttribute('aria-valuenow',String(Math.round(r*100)));}
+  pb.onclick=function(){if(a.paused){a.play();}else{a.pause();}};
+  a.onplay=function(){pb.textContent='❚❚';pb.setAttribute('aria-label','توقف');};
+  a.onpause=function(){pb.textContent='▶';pb.setAttribute('aria-label','پخش');};
+  a.ontimeupdate=draw;a.onloadedmetadata=draw;
+  a.onended=function(){a.currentTime=0;};
+  tk.onclick=function(e){var b=tk.getBoundingClientRect();
+    var r=1-((e.clientX-b.left)/b.width);
+    a.currentTime=Math.min(Math.max(r,0),1)*dur();};
+  tk.onkeydown=function(e){
+    if(e.key==='ArrowLeft'){a.currentTime=a.currentTime+5;e.preventDefault();}
+    if(e.key==='ArrowRight'){a.currentTime=a.currentTime-5;e.preventDefault();}
+    if(e.key===' '){pb.click();e.preventDefault();}};
+  document.getElementById('bk').onclick=function(){a.currentTime=Math.max(0,a.currentTime-15);};
+  document.getElementById('fw').onclick=function(){a.currentTime=Math.min(dur(),a.currentTime+15);};
+  /* یادآوری جای پخش — برای قطعه‌های بلند */
+  function savePos(){try{
+    if(a.currentTime>20&&a.currentTime<dur()-20){localStorage.setItem(KEY,String(Math.floor(a.currentTime)));}
+    else{localStorage.removeItem(KEY);}
+  }catch(e){}}
+  setInterval(function(){if(!a.paused){savePos();}},5000);
+  a.addEventListener('pause',savePos);
+  a.addEventListener('ended',function(){try{localStorage.removeItem(KEY);}catch(e){}});
+  var saved=0;try{saved=parseInt(localStorage.getItem(KEY)||'0',10)||0;}catch(e){}
+  if(saved>20){
+    var rs=document.getElementById('rs');
+    rs.textContent='▶ ادامه از '+fmt(saved);
+    rs.style.display='';
+    rs.onclick=function(){a.currentTime=saved;a.play();rs.style.display='none';};
+  }
+  var chips=document.querySelectorAll('[data-rate]');
+  for(var i=0;i<chips.length;i++){(function(c){
+    c.onclick=function(){a.playbackRate=parseFloat(c.getAttribute('data-rate'));
+      for(var j=0;j<chips.length;j++){chips[j].setAttribute('aria-pressed',String(chips[j]===c));}};
+  })(chips[i]);}
+  draw();
+})();
+</script>
+</body>
+</html>`;
+
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=UTF-8", "Cache-Control": "public, max-age=300" }
+  });
+}
+
+/* ---------- فهرست تحلیل‌ها ---------- */
+
+async function handleTahlilList(url, env) {
+  const index = await getTahlilIndex(env);
+  const items = index.map(i =>
+    `<li><a href="/tahlil/${escHtml(i.id)}"><strong>${escHtml(i.title)}</strong>` +
+    `<span>${escHtml(tahlilClock(i.duration))} · ${escHtml(formatFaDate(i.date))}</span></a></li>`
+  ).join("\n");
+
+  const html = `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تحلیل صوتی | پالس ایران ۲۴</title>
+<meta name="description" content="تحلیل‌های صوتی روزانه پالس ایران ۲۴ بر پایه منابع خبری بین‌المللی — همراه با متن کامل.">
+<link rel="canonical" href="${SITE_ORIGIN}/tahlil">
+<link rel="alternate" type="application/rss+xml" title="پادکست تحلیل صوتی" href="${SITE_ORIGIN}/tahlil.xml">
+<meta name="theme-color" content="#0D1117">
+<link rel="icon" href="/assets/favicon.ico" sizes="any">
+${TAHLIL_FONT}
+<style>${TAHLIL_CSS}</style>
+</head>
+<body>
+${TAHLIL_HEADER}
+<main class="wrap">
+  <div class="art-meta"><span class="badge">تحلیل صوتی</span></div>
+  <h1>شنیدن خبر، پشتِ خبر</h1>
+  <p class="lede">تحلیل‌های کوتاه روزانه بر پایه منابع خبری بین‌المللی. هر قطعه متن کامل هم دارد.</p>
+  ${items ? `<ul class="tlist">${items}</ul>` : `<p class="empty">اولین تحلیل صوتی به‌زودی منتشر می‌شود.</p>`}
+  <a class="home-link" href="/">← بازگشت به صفحه اصلی</a>
+</main>
+${TAHLIL_FOOTER}
+</body>
+</html>`;
+
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=UTF-8", "Cache-Control": "public, max-age=180" }
+  });
+}
+
+/* ---------- فید پادکست /tahlil.xml ---------- */
+
+async function handleTahlilFeed(env) {
+  const kv = env && env.PULSE_STATS;
+  const index = await getTahlilIndex(env);
+  const parts = [];
+
+  for (const i of index.slice(0, 50)) {
+    let t = null;
+    try {
+      const raw = kv ? await kv.get("tahlil:" + i.id) : null;
+      if (raw) t = JSON.parse(raw);
+    } catch (e) {}
+    if (!t) continue;
+    const link = SITE_ORIGIN + "/tahlil/" + t.id;
+    const audioAbs = /^https?:\/\//.test(t.audio) ? t.audio : SITE_ORIGIN + t.audio;
+    const pub = (t.date && !isNaN(Date.parse(t.date))) ? new Date(t.date).toUTCString() : new Date().toUTCString();
+    parts.push(`    <item>
+      <title>${xmlEsc(t.title)}</title>
+      <link>${xmlEsc(link)}</link>
+      <guid isPermaLink="true">${xmlEsc(link)}</guid>
+      <pubDate>${pub}</pubDate>
+      <description>${xmlEsc(t.summary || t.title)}</description>
+      <enclosure url="${xmlEsc(audioAbs)}" type="audio/mpeg" length="0"/>
+      <itunes:duration>${xmlEsc(tahlilClock(t.duration))}</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+    </item>`);
+  }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>تحلیل صوتی پالس ایران ۲۴</title>
+    <link>${SITE_ORIGIN}/tahlil</link>
+    <description>تحلیل‌های کوتاه روزانه بر پایه منابع خبری بین‌المللی</description>
+    <language>fa-IR</language>
+    <itunes:author>Pulse Iran 24</itunes:author>
+    <itunes:category text="News"/>
+    <itunes:image href="${SITE_ORIGIN}/logo.png"/>
+    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+${parts.join("\n")}
+  </channel>
+</rss>`;
+
+  return new Response(xml, {
+    headers: { "Content-Type": "application/rss+xml; charset=UTF-8", "Cache-Control": "public, max-age=600" }
+  });
+}
+
+/* ---------- ورودی‌های sitemap ---------- */
+
+async function tahlilSitemapUrls(env) {
+  const index = await getTahlilIndex(env);
+  const out = [`  <url><loc>${SITE_ORIGIN}/tahlil</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`];
+  for (const i of index.slice(0, 300)) {
+    const lm = (i.date && !isNaN(Date.parse(i.date))) ? new Date(i.date).toISOString() : null;
+    out.push(
+      `  <url><loc>${SITE_ORIGIN}/tahlil/${i.id}</loc>` +
+      (lm ? `<lastmod>${lm}</lastmod>` : "") +
+      `<changefreq>monthly</changefreq><priority>0.7</priority></url>`
+    );
+  }
+  return out;
+}
+
+/* ---------- API پنل تحلیل صوتی ---------- */
+
+async function handleTahlilAdminApi(request, env) {
+  if (request.method !== "POST") return adminJson({ ok: false, error: "method" }, 405);
+
+  let body = {};
+  try { body = await request.json(); } catch (e) { body = {}; }
+
+  const auth = checkAdmin(request, env, body);
+  if (!auth.ok) return adminJson({ ok: false, error: auth.msg }, auth.code);
+
+  const kv = env.PULSE_STATS;
+  if (!kv) return adminJson({ ok: false, error: "kv_missing" }, 503);
+
+  const action = String(body.action || "");
+
+  if (action === "login") return adminJson({ ok: true });
+
+  if (action === "list") return adminJson({ ok: true, items: await getTahlilIndex(env) });
+
+  if (action === "create") {
+    const title = String(body.title || "").trim().slice(0, 200);
+    const audio = String(body.audio || "").trim().slice(0, 500);
+    if (!title) return adminJson({ ok: false, error: "title_required" }, 400);
+    if (!audio) return adminJson({ ok: false, error: "audio_required" }, 400);
+    if (!/^(\/|https:\/\/)/.test(audio)) return adminJson({ ok: false, error: "audio_bad_url" }, 400);
+
+    let id = String(body.id || "").trim().replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 60);
+    if (!id) id = String(Date.now());
+
+    const item = {
+      id,
+      title,
+      summary: String(body.summary || "").trim().slice(0, 400),
+      audio,
+      transcript: String(body.transcript || "").trim().slice(0, 60000),
+      sources: String(body.sources || "").trim().slice(0, 300),
+      filename: String(body.filename || "").trim().slice(0, 120),
+      image: String(body.image || "").trim().slice(0, 500) || null,
+      duration: parseTahlilDuration(body.duration),
+      date: new Date().toISOString()
+    };
+
+    await kv.put("tahlil:" + id, JSON.stringify(item));
+
+    let index = (await getTahlilIndex(env)).filter(x => x.id !== id);
+    index.unshift({ id, title, date: item.date, duration: item.duration });
+    if (index.length > TAHLIL_CAP) index = index.slice(0, TAHLIL_CAP);
+    await kv.put("tahlil_index", JSON.stringify(index));
+
+    let pushed = false, pushError = null;
+    if (body.push === true) {
+      const pr = await sendPush(env, "🎧 " + title, SITE_ORIGIN + "/tahlil/" + id, item.image);
+      pushed = pr.ok;
+      if (!pr.ok) pushError = pr.error;
+    }
+
+    return adminJson({ ok: true, id, url: "/tahlil/" + id, pushed, pushError });
+  }
+
+  if (action === "delete") {
+    const id = String(body.id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 60);
+    if (!id) return adminJson({ ok: false, error: "id_required" }, 400);
+    try { await kv.delete("tahlil:" + id); } catch (e) {}
+    const index = (await getTahlilIndex(env)).filter(x => x.id !== id);
+    await kv.put("tahlil_index", JSON.stringify(index));
+    return adminJson({ ok: true });
+  }
+
+  return adminJson({ ok: false, error: "unknown_action" }, 400);
+}
+
+function handleTahlilAdminPage() {
+  return new Response(TAHLIL_ADMIN_HTML, {
+    headers: {
+      "Content-Type": "text/html; charset=UTF-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow"
+    }
+  });
+}
+
+const TAHLIL_ADMIN_HTML = `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>پنل تحلیل صوتی — پالس ایران ۲۴</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+ :root{--bg:#0D1117;--surface:#161C26;--line:#2A3442;--text:#E9EDF2;--dim:#8B96A5;--pulse:#FF2D4A}
+ *{box-sizing:border-box}
+ body{margin:0;font-family:'Vazirmatn',Tahoma,sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
+ .wrap{max-width:720px;margin:0 auto;padding:22px 16px}
+ h1{font-size:1.3rem;font-weight:900} h1 b{color:var(--pulse)}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
+ label{display:block;font-size:.9rem;color:var(--dim);margin:12px 0 6px}
+ input,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:inherit;font-size:1rem;padding:11px 12px}
+ textarea{min-height:170px;resize:vertical;line-height:1.9}
+ button{background:var(--pulse);color:#fff;border:0;border-radius:10px;font-family:inherit;font-weight:700;font-size:1rem;padding:12px 20px;cursor:pointer;margin-top:14px}
+ button.sec{background:var(--surface);border:1px solid var(--line);color:var(--text);padding:7px 14px;font-size:.85rem;margin:0}
+ button:disabled{opacity:.5}
+ .msg{margin-top:12px;font-size:.9rem;min-height:1.2em}
+ .ok{color:#39d98a}.err{color:var(--pulse)}
+ .hidden{display:none}
+ .item{border-top:1px solid var(--line);padding:12px 0;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+ .item:first-child{border-top:0;margin-top:10px}
+ .item p{margin:0 0 4px;font-size:.92rem}
+ .item small{color:var(--dim);font-size:.8rem}
+ .hint{color:var(--dim);font-size:.82rem;margin-top:8px}
+ a.nav{color:#2AABEE;text-decoration:none;font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1>تحلیل صوتی <b>پالس ایران ۲۴</b></h1>
+ <p><a class="nav" href="/admin">← پنل خبر</a> &nbsp;·&nbsp; <a class="nav" href="/tahlil" target="_blank">صفحه‌ی تحلیل‌ها</a></p>
+
+ <div id="login" class="card">
+   <label>رمز ورود</label>
+   <input id="pw" type="password" autocomplete="current-password" placeholder="ADMIN_TOKEN">
+   <button id="loginBtn">ورود</button>
+   <div id="loginMsg" class="msg"></div>
+ </div>
+
+ <div id="editor" class="card hidden">
+   <label>عنوان *</label>
+   <input id="title" maxlength="200" placeholder="وقفه‌ای که هنوز صلح نیست">
+   <label>آدرس فایل صوتی * (mp3 در پوشه assets/audio)</label>
+   <input id="audio" placeholder="/assets/audio/1405-05-05.mp3">
+   <label>مدت — هم ثانیه قبول است هم دقیقه:ثانیه (۶۰۰ یا 10:00)</label>
+   <input id="duration" placeholder="10:00">
+   <label>خلاصه (یکی دو خط، در گوگل و اشتراک‌گذاری دیده می‌شود)</label>
+   <textarea id="summary" style="min-height:80px"></textarea>
+   <label>متن کامل (بین پاراگراف‌ها یک خط خالی بگذارید)</label>
+   <textarea id="transcript"></textarea>
+   <label>منابع</label>
+   <input id="sources" placeholder="الجزیره، رویترز، ایران اینترنشنال">
+   <label>نام نمایشی فایل صوتی (اختیاری — همین نام در صفحه و هنگام دانلود دیده می‌شود)</label>
+   <input id="fname" placeholder="تحلیل ۵ مرداد — وقفه‌ای که هنوز صلح نیست.mp3">
+   <label>تصویر کاور (اختیاری)</label>
+   <input id="image" placeholder="/logo.png">
+   <label>شناسه دلخواه در آدرس (اختیاری)</label>
+   <input id="cid" placeholder="1405-05-05">
+   <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;font-size:.92rem">
+     <input type="checkbox" id="pushChk" checked style="width:auto;margin:0"> 🔔 ارسال اعلان وب‌پوش
+   </label>
+   <button id="pubBtn">انتشار تحلیل</button>
+   <div id="pubMsg" class="msg"></div>
+   <div class="hint">فایل mp3 را از قبل در پوشه assets/audio در گیت‌هاب بگذارید تا آدرس بالا کار کند.</div>
+ </div>
+
+ <div id="listCard" class="card hidden">
+   <b>تحلیل‌های منتشرشده</b>
+   <div id="list"></div>
+ </div>
+</div>
+<script>
+(function(){
+  var token = sessionStorage.getItem('pi24_admin') || '';
+  function el(id){ return document.getElementById(id); }
+
+  function api(action, extra){
+    var payload = Object.assign({action:action}, extra||{});
+    return fetch('/tahlil-admin/api', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify(payload)
+    }).then(function(r){ return r.json().then(function(j){ j._status=r.status; return j; }); });
+  }
+
+  function showApp(){
+    el('login').classList.add('hidden');
+    el('editor').classList.remove('hidden');
+    el('listCard').classList.remove('hidden');
+    loadList();
+  }
+
+  function doLogin(){
+    token = el('pw').value.trim();
+    if(!token){ return; }
+    el('loginMsg').textContent = 'در حال بررسی...'; el('loginMsg').className='msg';
+    api('login').then(function(j){
+      if(j.ok){ sessionStorage.setItem('pi24_admin', token); el('loginMsg').textContent=''; showApp(); }
+      else { el('loginMsg').textContent = j._status===503 ? 'ADMIN_TOKEN تنظیم نشده' : 'رمز اشتباه است'; el('loginMsg').className='msg err'; }
+    }).catch(function(){ el('loginMsg').textContent='خطای شبکه'; el('loginMsg').className='msg err'; });
+  }
+
+  function doPublish(){
+    var title = el('title').value.trim();
+    var audio = el('audio').value.trim();
+    if(!title || !audio){ el('pubMsg').textContent='عنوان و آدرس فایل صوتی لازم است'; el('pubMsg').className='msg err'; return; }
+    el('pubBtn').disabled = true;
+    el('pubMsg').textContent='در حال انتشار...'; el('pubMsg').className='msg';
+    api('create', {
+      title:title, audio:audio,
+      duration: el('duration').value.trim(),
+      summary: el('summary').value,
+      transcript: el('transcript').value,
+      sources: el('sources').value.trim(),
+      filename: el('fname').value.trim(),
+      image: el('image').value.trim(),
+      id: el('cid').value.trim(),
+      push: el('pushChk').checked
+    }).then(function(j){
+      el('pubBtn').disabled = false;
+      if(j.ok){
+        var note = j.pushed ? ' · اعلان ارسال شد 🔔' : (j.pushError ? ' · اعلان نرفت ('+j.pushError+')' : '');
+        el('pubMsg').innerHTML = 'منتشر شد ✓' + note + ' &nbsp; <a style="color:#2AABEE" target="_blank" href="'+j.url+'">مشاهده صفحه</a>';
+        el('pubMsg').className='msg ok';
+        el('title').value=''; el('audio').value=''; el('duration').value='';
+        el('summary').value=''; el('transcript').value=''; el('cid').value=''; el('fname').value='';
+        loadList();
+      } else {
+        el('pubMsg').textContent = j.error==='unauthorized' ? 'نشست منقضی شد، دوباره وارد شوید' : ('خطا: '+(j.error||'?'));
+        el('pubMsg').className='msg err';
+      }
+    }).catch(function(){ el('pubBtn').disabled=false; el('pubMsg').textContent='خطای شبکه'; el('pubMsg').className='msg err'; });
+  }
+
+  function loadList(){
+    api('list').then(function(j){
+      if(!j.ok){ return; }
+      var box = el('list'); box.innerHTML='';
+      if(!j.items || !j.items.length){ box.innerHTML='<p class="hint">هنوز تحلیلی منتشر نشده.</p>'; return; }
+      j.items.forEach(function(it){
+        var div = document.createElement('div'); div.className='item';
+        var left = document.createElement('div');
+        var p = document.createElement('p'); p.textContent = it.title || '';
+        var s = document.createElement('small');
+        s.textContent = String(it.date||'').slice(0,10) + '  ·  /tahlil/' + it.id;
+        left.appendChild(p); left.appendChild(s);
+        var btn = document.createElement('button'); btn.className='sec'; btn.textContent='حذف';
+        btn.onclick = function(){
+          if(!confirm('این تحلیل حذف شود؟')){ return; }
+          api('delete', {id:it.id}).then(function(r){ if(r.ok){ loadList(); } });
+        };
+        div.appendChild(left); div.appendChild(btn);
+        box.appendChild(div);
+      });
+    });
+  }
+
+  el('loginBtn').onclick = doLogin;
+  el('pw').addEventListener('keydown', function(e){ if(e.key==='Enter'){ doLogin(); } });
+  el('pubBtn').onclick = doPublish;
+  if(token){ api('login').then(function(j){ if(j.ok){ showApp(); } else { sessionStorage.removeItem('pi24_admin'); } }); }
+})();
+</script>
+</body>
+</html>`;
