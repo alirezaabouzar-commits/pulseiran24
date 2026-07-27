@@ -6,10 +6,8 @@
 <title>پالس ایران ۲۴ | Pulse Iran 24</title>
 <meta name="description" content="پالس ایران ۲۴ — کانال خبری فارسی‌زبان در تلگرام. اخبار لحظه به لحظه ایران و جهان. Pulse Iran 24 — Persian news channel on Telegram.">
 <link rel="canonical" href="https://pulseiran24.com/">
-<link rel="alternate" hreflang="fa" href="https://pulseiran24.com/">
-<link rel="alternate" hreflang="en" href="https://pulseiran24.com/en">
-<link rel="alternate" hreflang="de" href="https://pulseiran24.com/de">
-<link rel="alternate" hreflang="x-default" href="https://pulseiran24.com/">
+<link rel="alternate" type="application/rss+xml" title="پالس ایران ۲۴ — خبرها" href="https://pulseiran24.com/rss.xml">
+<link rel="alternate" type="application/rss+xml" title="پالس ایران ۲۴ — تحلیل صوتی" href="https://pulseiran24.com/tahlil.xml">
 <meta name="theme-color" content="#0D1117">
 <script>
 /* تم روشن پیش‌فرض؛ انتخاب کاربر در localStorage می‌ماند (قبل از رندر تا فلش نزند) */
@@ -874,6 +872,8 @@
       padding:7px 14px;font-size:.85rem;font-weight:600;white-space:nowrap;transition:border-color .15s;
     }
     .btn-slim:hover{border-color:var(--pulse,#FF2D4A)}
+    .btn-slim.btn-tahlil{border-color:rgba(255,45,74,.45);color:var(--pulse,#FF2D4A)}
+    .btn-slim.btn-tahlil:hover{background:var(--pulse-soft,rgba(255,45,74,.12))}
     @media(min-width:700px){header.slim-head .tagline-slim{display:inline}}
     @media(max-width:480px){header.slim-head h1{font-size:1.2rem}}
   </style>
@@ -891,6 +891,7 @@
     <div class="head-actions">
       <button class="btn-slim" id="themeToggle" aria-label="تغییر حالت روز و شب" title="حالت روز/شب">🌙</button>
       <span class="live-badge-slim" id="t-badge"><span class="live-dot"></span> پوشش زنده خبر در تلگرام</span>
+      <a class="btn-slim btn-tahlil" href="/tahlil" id="t-tahlil">🎧 تحلیل صوتی</a>
       <a class="btn-slim" href="/jam2026.html" id="t-livescores">⚽ نتایج زنده فوتبال</a>
       <a class="btn-slim" href="/podcast.html" id="t-podcast">🎙 پادکست</a>
       <a class="btn-slim" href="/archive.html" id="t-archive">🗂 آرشیو</a>
@@ -1333,6 +1334,11 @@
     <a href="https://tiktok.com/@pulseiran24" target="_blank" rel="noopener" id="t-f4">تیک‌تاک</a>
   </div>
   <div class="legal-links">
+    <a href="/tahlil" id="t-ftahlil">🎧 تحلیل صوتی</a>
+    <a href="/podcast.html" id="t-fpodcast">🎙 پادکست</a>
+    <a href="/archive.html" id="t-farchive">🗂 آرشیو</a>
+  </div>
+  <div class="legal-links">
     <a href="/darbare.html" id="t-l1">درباره ما</a>
     <a href="/khatte-mashy.html" id="t-l2">خط‌مشی تحریری</a>
     <a href="/tashih.html" id="t-l3">تصحیح خطا</a>
@@ -1406,6 +1412,7 @@ const I18N = {
     livescores: "⚽ نتایج زنده فوتبال",
     podcast: "🎙 پادکست",
     archivelnk: "🗂 آرشیو",
+    tahlil: "🎧 تحلیل صوتی",
     football: "⚽ فوتبال زنده",
     liveBadge: "زنده",
     rooydad: "رویدادهای روز",
@@ -1467,6 +1474,7 @@ const I18N = {
     livescores: "⚽ Live football scores",
     podcast: "🎙 Podcast",
     archivelnk: "🗂 Archive",
+    tahlil: "🎧 Audio analysis",
     football: "⚽ Live Football",
     liveBadge: "LIVE",
     rooydad: "Today's Events",
@@ -1528,6 +1536,7 @@ const I18N = {
     livescores: "⚽ Fußball live",
     podcast: "🎙 Podcast",
     archivelnk: "🗂 Archiv",
+    tahlil: "🎧 Audio-Analyse",
     football: "⚽ Fußball live",
     liveBadge: "LIVE",
     rooydad: "Ereignisse des Tages",
@@ -1586,11 +1595,6 @@ try {
   const saved = localStorage.getItem("pulseLang");
   if (saved && I18N[saved]) currentLang = saved;
 } catch (e) { /* بدون ذخیره‌سازی ادامه می‌دهیم */ }
-
-/* اگر صفحه از مسیر /en یا /de سرو شده باشد، زبان همان مسیر مقدم است */
-if (typeof window !== "undefined" && window.__PI24_LANG && I18N[window.__PI24_LANG]) {
-  currentLang = window.__PI24_LANG;
-}
 
 /* ---------- ابزارها ---------- */
 const esc = s => String(s || "").replace(/[&<>"']/g, c =>
@@ -2096,6 +2100,7 @@ function applyUI() {
     "t-f1": "f1", "t-f2": "f2", "t-f3": "f3", "t-f4": "f4", "t-copy": "copyright",
     "t-cttitle": "cttitle", "t-cttext": "cttext", "t-visits": "visits", "t-intl": "intl",
     "t-livescores": "livescores", "t-podcast": "podcast", "t-archive": "archivelnk",
+    "t-tahlil": "tahlil", "t-ftahlil": "tahlil", "t-fpodcast": "podcast", "t-farchive": "archivelnk",
     "t-football": "football", "t-rooydad": "rooydad", "t-jarayed": "jarayedTitle",
     "t-sources": "sources", "t-market": "market",
     "t-l1": "l1", "t-l2": "l2", "t-l3": "l3"
