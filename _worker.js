@@ -1,4 +1,4 @@
-/* build: v81 — رفع نمایش موجودیت‌های HTML خام مثل &#33; در متن خبر */
+/* build: v82 — کاهش شدید نوشتن در KV (سقف رایگان: ۱۰۰۰ put در روز) */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -25,6 +25,49 @@ const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Access-Control-Allow-Origin": "*"
 };
+
+/* ============================================================
+   v82 — ابزارهای صرفه‌جویی در KV
+   سقف پلن رایگان: ۱۰۰۰ عملیات put در روز (خواندن ۱۰۰٬۰۰۰ است و مشکلی ندارد).
+   راهکار: هرچه کش موقتی است به Cache API لبه‌ی کلادفلر منتقل می‌شود
+   (رایگان و بدون سقف) و KV فقط برای داده‌های ماندگار می‌ماند.
+   ============================================================ */
+
+async function edgeGet(key) {
+  try {
+    const r = await caches.default.match(new Request("https://pi24.cache/" + key));
+    if (r) return await r.text();
+  } catch (e) {}
+  return null;
+}
+
+async function edgePut(key, body, ttl, ctx) {
+  try {
+    const req = new Request("https://pi24.cache/" + key);
+    const resp = new Response(body, {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=" + (ttl || 300)
+      }
+    });
+    if (ctx && ctx.waitUntil) ctx.waitUntil(caches.default.put(req, resp));
+    else await caches.default.put(req, resp);
+  } catch (e) {}
+}
+
+/* نوشتن کم‌تکرار در KV: حداکثر یک‌بار در هر بازه (ثانیه) در هر isolate */
+const KV_LAST_WRITE = new Map();
+function kvThrottleOk(key, seconds) {
+  const now = Date.now();
+  const last = KV_LAST_WRITE.get(key) || 0;
+  if (now - last < (seconds || 3600) * 1000) return false;
+  KV_LAST_WRITE.set(key, now);
+  return true;
+}
+
+/* شمارنده‌ی بازدید به‌صورت دسته‌ای نوشته می‌شود، نه در هر بازدید */
+let VISIT_PENDING = 0;
+const VISIT_FLUSH_AT = 25;
 
 export default {
   async fetch(request, env, ctx) {
@@ -562,19 +605,10 @@ function trHash(s) {
   return h.toString(36) + "-" + s.length;
 }
 
-async function translateOne(text, target, env) {
+/* ترجمه‌ی خام بدون هیچ تماسی با KV */
+async function translateRaw(text, target) {
   const src = String(text || "").trim();
   if (!src) return "";
-  const kv = env.PULSE_STATS;
-  const key = "tr:" + target + ":" + trHash(src);
-
-  if (kv) {
-    try {
-      const hit = await kv.get(key);
-      if (hit) return hit;
-    } catch (e) {}
-  }
-
   let out = "";
   try {
     const r = await fetch(
@@ -600,11 +634,64 @@ async function translateOne(text, target, env) {
     } catch (e) {}
   }
 
-  if (!out) return src; /* در بدترین حالت متن فارسی می‌ماند */
+  return out || src; /* در بدترین حالت متن فارسی می‌ماند */
+}
+
+/* ترجمه‌ی تک‌رشته‌ای با کش KV (یک کلید برای هر رشته) */
+async function translateOne(text, target, env) {
+  const src = String(text || "").trim();
+  if (!src) return "";
+  const kv = env && env.PULSE_STATS;
+  const key = "tr:" + target + ":" + trHash(src);
+
   if (kv) {
+    try {
+      const hit = await kv.get(key);
+      if (hit) return hit;
+    } catch (e) {}
+  }
+
+  const out = await translateRaw(src, target);
+  /* اگر ترجمه شکست خورد (خروجی = ورودی) در KV ذخیره نمی‌شود تا put هدر نرود */
+  if (kv && out && out !== src) {
     try { await kv.put(key, out, { expirationTtl: 60 * 60 * 24 * 90 }); } catch (e) {}
   }
   return out;
+}
+
+/* v82: ترجمه‌ی گروهی — کل بندهای یک صفحه در «یک» کلید KV.
+   به‌جای ۲۶ put برای هر مقاله، فقط ۱ put نوشته می‌شود. */
+async function translateGroup(texts, target, env, groupKey) {
+  const list = Array.from(new Set((texts || []).map(t => String(t || "").trim()).filter(Boolean)));
+  if (!list.length) return {};
+  const kv = env && env.PULSE_STATS;
+  const key = "trg:" + target + ":" + groupKey;
+
+  let map = {};
+  if (kv) {
+    try {
+      const raw = await kv.get(key);
+      if (raw) { const j = JSON.parse(raw); if (j && typeof j === "object") map = j; }
+    } catch (e) { map = {}; }
+  }
+
+  const missing = list.filter(t => !map[t]);
+  if (!missing.length) return map;
+
+  let changed = false;
+  try {
+    const done = await Promise.all(missing.map(t => translateRaw(t, target)));
+    missing.forEach((t, i) => {
+      const v = done[i];
+      if (v && v !== t) { map[t] = v; changed = true; }
+      else map[t] = t;
+    });
+  } catch (e) {}
+
+  if (kv && changed) {
+    try { await kv.put(key, JSON.stringify(map), { expirationTtl: 60 * 60 * 24 * 90 }); } catch (e) {}
+  }
+  return map;
 }
 
 function serverPostId(p) {
@@ -972,10 +1059,8 @@ async function handleArticle(url, env, ctx, lang) {
       const texts = [];
       if (parsed.title) texts.push(parsed.title);
       for (const p of parsed.paragraphs.slice(0, 25)) if (p && p.trim()) texts.push(p);
-      const uniq = Array.from(new Set(texts));
-      const done = await Promise.all(uniq.map(t => translateOne(t, lang, env)));
-      tr = {};
-      uniq.forEach((t, i) => { tr[t] = done[i]; });
+      /* v82: یک کلید KV برای کل مقاله به‌جای یک کلید برای هر بند */
+      tr = await translateGroup(texts, lang, env, "art" + String(id));
     } catch (e) { tr = null; }
   }
 
@@ -1220,8 +1305,17 @@ async function handleStats(url, env) {
     if (action === "visit" || action === "get") {
       let visits = parseInt(await kv.get("visits") || "0", 10);
       if (action === "visit") {
-        visits += 1;
-        await kv.put("visits", String(visits));
+        /* v82: به‌جای یک put در هر بازدید، هر ۲۵ بازدید یک‌بار نوشته می‌شود.
+           عدد نمایش‌داده‌شده همیشه درست است؛ فقط ذخیره‌ی نهایی دسته‌ای است. */
+        VISIT_PENDING += 1;
+        if (VISIT_PENDING >= VISIT_FLUSH_AT) {
+          const add = VISIT_PENDING;
+          VISIT_PENDING = 0;
+          visits += add;
+          try { await kv.put("visits", String(visits)); } catch (e) {}
+        } else {
+          visits += VISIT_PENDING;
+        }
       }
       return new Response(JSON.stringify({ visits }), { headers: JSON_HEADERS });
     }
@@ -1316,10 +1410,14 @@ function parseLatestEpisode(xml) {
 async function handlePodcasts(env, ctx) {
   const CACHE_KEY = "podcasts:latest:v4";
   const kv = env && env.PULSE_STATS;
+  /* v82: اول کش لبه (رایگان)، بعد کش KV — نوشتن در KV حداکثر ساعتی یک‌بار */
+  const edge = await edgeGet(CACHE_KEY);
+  if (edge) return new Response(edge, { headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=900" } });
   if (kv) {
     try {
       const cached = await kv.get(CACHE_KEY);
       if (cached) {
+        await edgePut(CACHE_KEY, cached, 900, ctx);
         return new Response(cached, { headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=900" } });
       }
     } catch (e) {}
@@ -1342,8 +1440,11 @@ async function handlePodcasts(env, ctx) {
     } catch (e) {}
   }));
   const body = JSON.stringify({ ok: true, items: items });
-  if (kv && ctx && ctx.waitUntil) {
-    try { ctx.waitUntil(kv.put(CACHE_KEY, body, { expirationTtl: 1800 })); } catch (e) {}
+  if (items.length) {
+    await edgePut(CACHE_KEY, body, 900, ctx);
+    if (kv && ctx && ctx.waitUntil && kvThrottleOk("podcasts", 3600)) {
+      try { ctx.waitUntil(kv.put(CACHE_KEY, body, { expirationTtl: 7200 })); } catch (e) {}
+    }
   }
   return new Response(body, { headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=900" } });
 }
@@ -1361,13 +1462,10 @@ const RATE_COINS = [
 
 async function handleRates(env, ctx) {
   const CACHE_KEY = "rates:latest:v2";
-  const kv = env && env.PULSE_STATS;
-  if (kv) {
-    try {
-      const cached = await kv.get(CACHE_KEY);
-      if (cached) return new Response(cached, { headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=180" } });
-    } catch (e) {}
-  }
+  /* v82: قیمت‌ها فقط روی لبه کش می‌شوند — هیچ نوشتنی در KV.
+     (تا ۲۸۸ put در روز صرفه‌جویی) */
+  const edge = await edgeGet(CACHE_KEY);
+  if (edge) return new Response(edge, { headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=180" } });
   let items = [];
 
   // منبع اول: CryptoCompare (قیمت + درصد تغییر، بدون کلید)
@@ -1407,9 +1505,7 @@ async function handleRates(env, ctx) {
   }
 
   const body = JSON.stringify({ ok: true, items: items });
-  if (kv && ctx && ctx.waitUntil && items.length) {
-    try { ctx.waitUntil(kv.put(CACHE_KEY, body, { expirationTtl: 300 })); } catch (e) {}
-  }
+  if (items.length) await edgePut(CACHE_KEY, body, 180, ctx);
   return new Response(body, { headers: { ...JSON_HEADERS, "Cache-Control": items.length ? "public, max-age=180" : "no-store" } });
 }
 
@@ -1957,7 +2053,7 @@ async function handlePressCovers(env, ctx) {
     return new Response(JSON.stringify({ ok: false }), { status: 502, headers: JSON_HEADERS });
   }
 
-  if (kv) {
+  if (kv && ctx && ctx.waitUntil && kvThrottleOk("press_covers", 3600)) {
     try { ctx.waitUntil(kv.put("press_covers", JSON.stringify({ ts: Date.now(), covers }))); } catch (e) {}
   }
   return new Response(JSON.stringify({ ok: true, covers }), {
