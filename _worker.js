@@ -1,4 +1,4 @@
-/* build: v79 — رفع نمایش موجودیت‌های HTML خام مثل &#33; در متن خبر */
+/* build: v81 — رفع نمایش موجودیت‌های HTML خام مثل &#33; در متن خبر */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -72,6 +72,10 @@ export default {
     if (/^\/(en|de)\/tahlil\/?$/.test(path)) return handleTahlilListI18n(url, env, path.slice(1, 3));
     if (/^\/(en|de)\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPageI18n(url, env, path.split("/")[3], path.slice(1, 3));
     if (/^\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPageI18n(url, env, path.split("/")[2], "fa");
+
+    if (path === "/api/tahlil-comment") return handleTahlilCommentPost(request, env);
+    if (path === "/tahlil-comments-admin" || path === "/tahlil-comments-admin/") return handleTahlilCommentsAdminPage();
+    if (path === "/tahlil-comments-admin/api") return handleTahlilCommentsAdminApi(request, env);
 
     return env.ASSETS.fetch(request);
   }
@@ -1109,9 +1113,7 @@ ${artAlt}
 <meta name="twitter:description" content="${escHtml(description)}">
 <meta name="twitter:image" content="${escHtml(absImage)}">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">
 <script type="application/ld+json">${ld}</script>
 <style>
   :root{--bg:#0D1117;--surface:#161C26;--line:#2A3442;--text:#E9EDF2;--dim:#8B96A5;--pulse:#FF2D4A;--tg:#2AABEE}
@@ -1184,7 +1186,7 @@ function notFoundArticlePage() {
 <title>خبر یافت نشد | Pulse Iran 24</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="/assets/favicon.ico" sizes="any">
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">
 <style>
   body{margin:0;font-family:'Vazirmatn',Tahoma,sans-serif;background:#0D1117;color:#E9EDF2;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px}
   h1{font-size:1.3rem;margin-bottom:10px}
@@ -1616,7 +1618,7 @@ const ADMIN_HTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>پنل خبر — پالس ایران ۲۴</title>
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">
 <style>
  :root{--bg:#0D1117;--surface:#161C26;--line:#2A3442;--text:#E9EDF2;--dim:#8B96A5;--pulse:#FF2D4A}
  *{box-sizing:border-box}
@@ -2174,9 +2176,7 @@ const TAHLIL_HEADER = `<header><div class="wrap">
 
 const TAHLIL_FOOTER = `<footer>پالس ایران ۲۴ — نبض خبر ایران و جهان · <a href="https://telegram.me/pulseiran24" target="_blank" rel="noopener">کانال تلگرام</a></footer>`;
 
-const TAHLIL_FONT = `<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">`;
+const TAHLIL_FONT = `<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">`;
 
 /* ---------- صفحه‌ی یک تحلیل ---------- */
 
@@ -2565,7 +2565,7 @@ const TAHLIL_ADMIN_HTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>پنل تحلیل صوتی — پالس ایران ۲۴</title>
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">
 <style>
  :root{--bg:#0D1117;--surface:#161C26;--line:#2A3442;--text:#E9EDF2;--dim:#8B96A5;--pulse:#FF2D4A}
  *{box-sizing:border-box}
@@ -3181,6 +3181,7 @@ ${tahlilHeaderHtml(L)}
     <a class="tg" href="${escHtml(tgShare)}" target="_blank" rel="noopener">Telegram</a>
     <a class="x" href="${escHtml(xShare)}" target="_blank" rel="noopener">X</a>
   </div>
+  ${await tahlilEngagementHtml(env, id, lang)}
   <a class="home-link" href="${L.list}">${escHtml(L.allTahlil)}</a>
 </main>
 ${tahlilFooterHtml(L)}
@@ -3323,7 +3324,7 @@ function tahlilNotFoundPage(lang) {
 <title>404 | Pulse Iran 24</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="/assets/favicon.ico" sizes="any">
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">
 <style>
   body{margin:0;font-family:'Vazirmatn',Tahoma,sans-serif;background:#0D1117;color:#E9EDF2;
     display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px}
@@ -3363,3 +3364,625 @@ async function tahlilSitemapUrlsI18n(env) {
   }
   return out;
 }
+
+
+/* ============================================================================
+   پالس ایران ۲۴ — لایک و نظر برای تحلیل صوتی  (v80)
+   ----------------------------------------------------------------------------
+   پیش‌نیاز: v79 نصب شده باشد.
+   این فایل append-only است و هیچ تابع موجودی را بازتعریف نمی‌کند.
+   از توابع موجود استفاده می‌کند: escHtml, checkAdmin, adminJson,
+   getTahlilIndex, JSON_HEADERS, SITE_ORIGIN
+
+   نصب در چهار گام — شرح کامل در انتهای همین فایل.
+
+   ── طراحی:
+      • لایک: از همان سیستم آمار فعلی سایت استفاده می‌کند
+        (/.netlify/functions/stats با شناسه t-{id}). هیچ کد سروری جدیدی ندارد.
+      • نظر: با تأیید قبل از انتشار. هیچ نظری بدون دیدن تو روی سایت نمی‌رود.
+      • IP ذخیره نمی‌شود. فقط یک هش کوتاه‌مدت (۵ دقیقه) برای جلوگیری از اسپم
+        نگه داشته می‌شود و خودکار پاک می‌شود — داده شخصی ذخیره‌شده نداریم.
+      • نظرهای تأییدشده سمت سرور در صفحه رندر می‌شوند (برای گوگل).
+      • پنل مدیریت نظرها جداست: /tahlil-comments-admin
+        هم صف تأیید دارد، هم امکان حذف نظرهایی که قبلاً تأیید شده‌اند.
+
+   ── کلیدهای KV (همان PULSE_STATS):
+      tcm:{tid}      آرایه‌ی نظرهای یک تحلیل  [{cid,name,text,ts,ok}]
+      tcm_queue      صف تأیید (نظرهای در انتظار، از همه‌ی تحلیل‌ها)
+      rlc:{hash}     محدودیت نرخ، TTL پنج دقیقه، خودکار پاک می‌شود
+      like:t-{tid}   شمارنده‌ی لایک (همان سیستم فعلی سایت)
+   ============================================================================ */
+
+const TCM_CAP = 300;          /* حداکثر نظر ذخیره‌شده برای هر تحلیل */
+const TCM_QUEUE_CAP = 300;    /* حداکثر طول صف تأیید */
+const TCM_TEXT_MAX = 1200;
+const TCM_NAME_MAX = 40;
+const TCM_RATE_TTL = 300;     /* ثانیه — فاصله‌ی لازم بین دو نظر از یک نفر */
+
+/* ---------- برچسب‌ها ---------- */
+
+const TCM_I18N = {
+  fa: {
+    heading: "نظرها",
+    likeLabel: "پسندیدم",
+    liked: "پسندیدید",
+    formTitle: "نظر خود را بنویسید",
+    name: "نام (اختیاری)",
+    namePh: "بی‌نام",
+    text: "متن نظر",
+    textPh: "نظرتان درباره‌ی این تحلیل...",
+    send: "ارسال نظر",
+    sending: "در حال ارسال...",
+    thanks: "نظر شما ثبت شد و پس از بررسی منتشر می‌شود.",
+    errEmpty: "متن نظر را بنویسید.",
+    errRate: "کمی صبر کنید و دوباره تلاش کنید.",
+    errNet: "خطای شبکه. دوباره تلاش کنید.",
+    none: "هنوز نظری منتشر نشده است.",
+    anon: "بی‌نام",
+    policy: "نظرها پیش از انتشار بررسی می‌شوند. توهین، تهدید و تبلیغ منتشر نمی‌شود."
+  },
+  en: {
+    heading: "Comments",
+    likeLabel: "Like",
+    liked: "Liked",
+    formTitle: "Leave a comment",
+    name: "Name (optional)",
+    namePh: "Anonymous",
+    text: "Your comment",
+    textPh: "What did you think of this analysis?",
+    send: "Post comment",
+    sending: "Sending...",
+    thanks: "Your comment was received and will appear after review.",
+    errEmpty: "Please write a comment.",
+    errRate: "Please wait a moment and try again.",
+    errNet: "Network error. Please try again.",
+    none: "No comments published yet.",
+    anon: "Anonymous",
+    policy: "Comments are reviewed before publication. Abuse, threats and advertising are not published."
+  },
+  de: {
+    heading: "Kommentare",
+    likeLabel: "Gefällt mir",
+    liked: "Gefällt dir",
+    formTitle: "Kommentar schreiben",
+    name: "Name (optional)",
+    namePh: "Anonym",
+    text: "Ihr Kommentar",
+    textPh: "Was halten Sie von dieser Analyse?",
+    send: "Kommentar senden",
+    sending: "Wird gesendet...",
+    thanks: "Ihr Kommentar ist eingegangen und erscheint nach der Prüfung.",
+    errEmpty: "Bitte schreiben Sie einen Kommentar.",
+    errRate: "Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+    errNet: "Netzwerkfehler. Bitte erneut versuchen.",
+    none: "Noch keine Kommentare veröffentlicht.",
+    anon: "Anonym",
+    policy: "Kommentare werden vor der Veröffentlichung geprüft. Beleidigungen, Drohungen und Werbung werden nicht veröffentlicht."
+  }
+};
+
+/* ---------- ابزارها ---------- */
+
+function tcmSafeId(v) {
+  return String(v || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 60);
+}
+
+/* پاک‌سازی متن ورودی: حذف تگ‌ها، کاراکترهای کنترلی و خط‌های خالی اضافه */
+function tcmClean(v, max) {
+  return String(v == null ? "" : v)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/[\r\t]/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, max);
+}
+
+/* هش کوتاه برای محدودیت نرخ — IP خام هرگز ذخیره نمی‌شود */
+function tcmRateHash(ip, tid) {
+  const s = String(ip || "0") + "|" + String(tid || "");
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+async function tcmGetComments(env, tid) {
+  const kv = env && env.PULSE_STATS;
+  if (!kv) return [];
+  try {
+    const raw = await kv.get("tcm:" + tid);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+async function tcmGetQueue(env) {
+  const kv = env && env.PULSE_STATS;
+  if (!kv) return [];
+  try {
+    const raw = await kv.get("tcm_queue");
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function tcmDate(ts, lang) {
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    if (lang === "fa") return formatFaDate(d.toISOString());
+    return d.toLocaleDateString(lang === "de" ? "de-DE" : "en-GB",
+      { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  } catch (e) { return ""; }
+}
+
+/* ---------- دریافت نظر تازه (عمومی) ---------- */
+
+async function handleTahlilCommentPost(request, env) {
+  if (request.method !== "POST") {
+    return new Response(JSON.stringify({ ok: false, error: "method" }), { status: 405, headers: JSON_HEADERS });
+  }
+
+  let body = {};
+  try { body = await request.json(); } catch (e) { body = {}; }
+
+  /* تله‌ی ضد ربات — اگر پر شده بود، وانمود به موفقیت */
+  if (body.hp) return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS });
+
+  const kv = env && env.PULSE_STATS;
+  if (!kv) return new Response(JSON.stringify({ ok: false, error: "kv_missing" }), { status: 503, headers: JSON_HEADERS });
+
+  const tid = tcmSafeId(body.id);
+  const text = tcmClean(body.text, TCM_TEXT_MAX);
+  const name = tcmClean(body.name, TCM_NAME_MAX);
+
+  if (!tid) return new Response(JSON.stringify({ ok: false, error: "id_required" }), { status: 400, headers: JSON_HEADERS });
+  if (text.length < 2) return new Response(JSON.stringify({ ok: false, error: "empty" }), { status: 400, headers: JSON_HEADERS });
+
+  /* تحلیل باید واقعاً وجود داشته باشد */
+  try {
+    const exists = await kv.get("tahlil:" + tid);
+    if (!exists) return new Response(JSON.stringify({ ok: false, error: "not_found" }), { status: 404, headers: JSON_HEADERS });
+  } catch (e) {}
+
+  /* محدودیت نرخ — کلید خودش بعد از پنج دقیقه پاک می‌شود */
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  const rlKey = "rlc:" + tcmRateHash(ip, tid);
+  try {
+    const busy = await kv.get(rlKey);
+    if (busy) return new Response(JSON.stringify({ ok: false, error: "rate" }), { status: 429, headers: JSON_HEADERS });
+  } catch (e) {}
+
+  const cid = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const item = { cid, name, text, ts: new Date().toISOString(), ok: false };
+
+  let items = await tcmGetComments(env, tid);
+  items.unshift(item);
+  if (items.length > TCM_CAP) items = items.slice(0, TCM_CAP);
+  await kv.put("tcm:" + tid, JSON.stringify(items));
+
+  let queue = await tcmGetQueue(env);
+  queue.unshift({ tid, cid, name, text: text.slice(0, 400), ts: item.ts });
+  if (queue.length > TCM_QUEUE_CAP) queue = queue.slice(0, TCM_QUEUE_CAP);
+  await kv.put("tcm_queue", JSON.stringify(queue));
+
+  try { await kv.put(rlKey, "1", { expirationTtl: TCM_RATE_TTL }); } catch (e) {}
+
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: { ...JSON_HEADERS, "Cache-Control": "no-store" }
+  });
+}
+
+/* ---------- بلوک لایک و نظر برای صفحه‌ی تحلیل ---------- */
+
+async function tahlilEngagementHtml(env, id, lang) {
+  const l = TCM_I18N[lang] ? lang : "fa";
+  const C = TCM_I18N[l];
+  const tid = tcmSafeId(id);
+
+  const items = (await tcmGetComments(env, tid)).filter(x => x && x.ok);
+
+  const list = items.length
+    ? items.map(c =>
+        `<li class="cm">
+          <div class="cm-h"><b>${escHtml(c.name || C.anon)}</b><span>${escHtml(tcmDate(c.ts, l))}</span></div>
+          <div class="cm-b">${escHtml(c.text).replace(/\n/g, "<br>")}</div>
+        </li>`).join("\n")
+    : `<li class="cm-none">${escHtml(C.none)}</li>`;
+
+  return `
+<style>
+  .engage{margin-top:34px;padding-top:22px;border-top:1px solid var(--line)}
+  .likebar{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+  .likebtn{background:var(--surface);border:1px solid var(--line);color:var(--text);
+    border-radius:999px;padding:9px 18px;font-family:inherit;font-size:.92rem;font-weight:600;
+    cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s}
+  .likebtn:hover{border-color:var(--pulse)}
+  .likebtn[data-on="1"]{background:rgba(255,45,74,.12);border-color:var(--pulse);color:var(--pulse)}
+  .likebtn .n{font-variant-numeric:tabular-nums;opacity:.85}
+  .engage h2{margin:0 0 6px}
+  .cmpolicy{color:var(--dim);font-size:.8rem;margin:0 0 18px}
+  .cmlist{list-style:none;padding:0;margin:0 0 26px}
+  .cm{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:13px 15px;margin-bottom:10px}
+  .cm-h{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:6px}
+  .cm-h b{font-size:.92rem}
+  .cm-h span{color:var(--dim);font-size:.76rem;white-space:nowrap}
+  .cm-b{font-size:.96rem;color:#dbe1e8;line-height:1.8;word-break:break-word}
+  .cm-none{color:var(--dim);font-size:.9rem}
+  .cmform label{display:block;font-size:.85rem;color:var(--dim);margin:12px 0 6px}
+  .cmform input,.cmform textarea{width:100%;background:var(--bg);border:1px solid var(--line);
+    border-radius:10px;color:var(--text);font-family:inherit;font-size:1rem;padding:11px 12px}
+  .cmform textarea{min-height:110px;resize:vertical;line-height:1.8}
+  .cmform button{background:var(--pulse);color:#fff;border:0;border-radius:10px;font-family:inherit;
+    font-weight:700;font-size:.95rem;padding:11px 22px;cursor:pointer;margin-top:14px}
+  .cmform button:disabled{opacity:.5}
+  .cmmsg{margin-top:10px;font-size:.88rem;min-height:1.2em}
+  .cmmsg.ok{color:#39d98a}.cmmsg.err{color:var(--pulse)}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+</style>
+<section class="engage">
+  <div class="likebar">
+    <button class="likebtn" id="lkb" data-on="0" aria-pressed="false">
+      <span>♥</span><span>${escHtml(C.likeLabel)}</span><span class="n" id="lkn">—</span>
+    </button>
+  </div>
+
+  <h2>${escHtml(C.heading)}</h2>
+  <p class="cmpolicy">${escHtml(C.policy)}</p>
+  <ul class="cmlist">${list}</ul>
+
+  <div class="cmform">
+    <b>${escHtml(C.formTitle)}</b>
+    <label for="cmn">${escHtml(C.name)}</label>
+    <input id="cmn" maxlength="40" placeholder="${escHtml(C.namePh)}">
+    <label for="cmt">${escHtml(C.text)}</label>
+    <textarea id="cmt" maxlength="1200" placeholder="${escHtml(C.textPh)}"></textarea>
+    <input class="hp" id="cmhp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <button id="cmb">${escHtml(C.send)}</button>
+    <div class="cmmsg" id="cmm"></div>
+  </div>
+</section>
+<script>
+(function(){
+  var TID=${JSON.stringify(tid)};
+  var T=${JSON.stringify({ sending: C.sending, send: C.send, thanks: C.thanks, errEmpty: C.errEmpty, errRate: C.errRate, errNet: C.errNet, liked: C.liked, likeLabel: C.likeLabel })};
+  var SID='t-'+TID, LK='pi24_like_'+SID;
+  var b=document.getElementById('lkb'), n=document.getElementById('lkn');
+
+  function mark(on){
+    b.setAttribute('data-on', on?'1':'0');
+    b.setAttribute('aria-pressed', on?'true':'false');
+    b.children[1].textContent = on ? T.liked : T.likeLabel;
+  }
+  var already=false;
+  try{ already = localStorage.getItem(LK)==='1'; }catch(e){}
+  mark(already);
+
+  fetch('/.netlify/functions/stats?action=likes&ids='+encodeURIComponent(SID))
+    .then(function(r){return r.json();})
+    .then(function(j){ var v=(j&&j.likes&&j.likes[SID])||0; n.textContent=v; })
+    .catch(function(){ n.textContent='0'; });
+
+  b.onclick=function(){
+    if(already){ return; }
+    already=true; mark(true);
+    n.textContent = String((parseInt(n.textContent,10)||0)+1);
+    try{ localStorage.setItem(LK,'1'); }catch(e){}
+    fetch('/.netlify/functions/stats?action=like&id='+encodeURIComponent(SID))
+      .then(function(r){return r.json();})
+      .then(function(j){ if(j&&typeof j.likes==='number'){ n.textContent=j.likes; } })
+      .catch(function(){});
+  };
+
+  var tb=document.getElementById('cmb'), tt=document.getElementById('cmt'),
+      tn=document.getElementById('cmn'), th=document.getElementById('cmhp'),
+      tm=document.getElementById('cmm');
+  tb.onclick=function(){
+    var txt=(tt.value||'').trim();
+    if(txt.length<2){ tm.textContent=T.errEmpty; tm.className='cmmsg err'; return; }
+    tb.disabled=true; tm.textContent=T.sending; tm.className='cmmsg';
+    fetch('/api/tahlil-comment',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id:TID, name:(tn.value||''), text:txt, hp:(th.value||'') })
+    }).then(function(r){ return r.json().then(function(j){ j._s=r.status; return j; }); })
+      .then(function(j){
+        tb.disabled=false;
+        if(j.ok){ tm.textContent=T.thanks; tm.className='cmmsg ok'; tt.value=''; tn.value=''; }
+        else if(j._s===429){ tm.textContent=T.errRate; tm.className='cmmsg err'; }
+        else { tm.textContent=T.errNet; tm.className='cmmsg err'; }
+      })
+      .catch(function(){ tb.disabled=false; tm.textContent=T.errNet; tm.className='cmmsg err'; });
+  };
+})();
+</script>`;
+}
+
+/* ---------- API پنل مدیریت نظرها ---------- */
+
+async function handleTahlilCommentsAdminApi(request, env) {
+  if (request.method !== "POST") return adminJson({ ok: false, error: "method" }, 405);
+
+  let body = {};
+  try { body = await request.json(); } catch (e) { body = {}; }
+
+  const auth = checkAdmin(request, env, body);
+  if (!auth.ok) return adminJson({ ok: false, error: auth.msg }, auth.code);
+
+  const kv = env.PULSE_STATS;
+  if (!kv) return adminJson({ ok: false, error: "kv_missing" }, 503);
+
+  const action = String(body.action || "");
+
+  if (action === "login") return adminJson({ ok: true });
+
+  /* صف تأیید — نظرهای منتشرنشده از همه‌ی تحلیل‌ها */
+  if (action === "queue") {
+    return adminJson({ ok: true, items: await tcmGetQueue(env) });
+  }
+
+  /* فهرست تحلیل‌ها برای انتخاب */
+  if (action === "tahlils") {
+    const idx = await getTahlilIndex(env);
+    return adminJson({ ok: true, items: idx.map(i => ({ id: i.id, title: i.title })) });
+  }
+
+  /* همه‌ی نظرهای یک تحلیل — تأییدشده و در انتظار، برای حذف */
+  if (action === "list") {
+    const tid = tcmSafeId(body.tid);
+    if (!tid) return adminJson({ ok: false, error: "tid_required" }, 400);
+    return adminJson({ ok: true, items: await tcmGetComments(env, tid) });
+  }
+
+  if (action === "approve" || action === "delete") {
+    const tid = tcmSafeId(body.tid);
+    const cid = tcmSafeId(body.cid);
+    if (!tid || !cid) return adminJson({ ok: false, error: "id_required" }, 400);
+
+    let items = await tcmGetComments(env, tid);
+    if (action === "approve") {
+      items = items.map(x => (x && x.cid === cid) ? { ...x, ok: true } : x);
+    } else {
+      items = items.filter(x => !(x && x.cid === cid));
+    }
+    await kv.put("tcm:" + tid, JSON.stringify(items));
+
+    /* در هر دو حالت از صف تأیید خارج می‌شود */
+    const queue = (await tcmGetQueue(env)).filter(q => !(q && q.tid === tid && q.cid === cid));
+    await kv.put("tcm_queue", JSON.stringify(queue));
+
+    return adminJson({ ok: true });
+  }
+
+  /* برگرداندن یک نظر تأییدشده به حالت پنهان (بدون حذف کامل) */
+  if (action === "hide") {
+    const tid = tcmSafeId(body.tid);
+    const cid = tcmSafeId(body.cid);
+    if (!tid || !cid) return adminJson({ ok: false, error: "id_required" }, 400);
+    const items = (await tcmGetComments(env, tid)).map(x => (x && x.cid === cid) ? { ...x, ok: false } : x);
+    await kv.put("tcm:" + tid, JSON.stringify(items));
+    return adminJson({ ok: true });
+  }
+
+  return adminJson({ ok: false, error: "unknown_action" }, 400);
+}
+
+function handleTahlilCommentsAdminPage() {
+  return new Response(TCM_ADMIN_HTML, {
+    headers: {
+      "Content-Type": "text/html; charset=UTF-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow"
+    }
+  });
+}
+
+const TCM_ADMIN_HTML = `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>مدیریت نظرها — پالس ایران ۲۴</title>
+<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">
+<style>
+ :root{--bg:#0D1117;--surface:#161C26;--line:#2A3442;--text:#E9EDF2;--dim:#8B96A5;--pulse:#FF2D4A}
+ *{box-sizing:border-box}
+ body{margin:0;font-family:'Vazirmatn',Tahoma,sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
+ .wrap{max-width:780px;margin:0 auto;padding:22px 16px}
+ h1{font-size:1.3rem;font-weight:900} h1 b{color:var(--pulse)}
+ h3{font-size:1rem;margin:0 0 6px}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
+ label{display:block;font-size:.9rem;color:var(--dim);margin:12px 0 6px}
+ input,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:inherit;font-size:1rem;padding:11px 12px}
+ button{background:var(--pulse);color:#fff;border:0;border-radius:10px;font-family:inherit;font-weight:700;font-size:1rem;padding:12px 20px;cursor:pointer;margin-top:14px}
+ button.sec{background:var(--surface);border:1px solid var(--line);color:var(--text);padding:6px 13px;font-size:.82rem;margin:0}
+ button.go{background:transparent;border:1px solid #39d98a;color:#39d98a;padding:6px 13px;font-size:.82rem;margin:0}
+ button.no{background:transparent;border:1px solid var(--pulse);color:var(--pulse);padding:6px 13px;font-size:.82rem;margin:0}
+ .msg{margin-top:12px;font-size:.9rem;min-height:1.2em}
+ .ok{color:#39d98a}.err{color:var(--pulse)}
+ .hidden{display:none}
+ .row{border-top:1px solid var(--line);padding:13px 0}
+ .row:first-child{border-top:0}
+ .row .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:5px}
+ .row b{font-size:.92rem}
+ .row small{color:var(--dim);font-size:.76rem}
+ .row p{margin:0 0 8px;font-size:.94rem;color:#dbe1e8;word-break:break-word;white-space:pre-wrap}
+ .btns{display:flex;gap:8px;flex-wrap:wrap}
+ .hint{color:var(--dim);font-size:.82rem;margin-top:8px}
+ .pill{display:inline-block;border-radius:999px;padding:1px 9px;font-size:.72rem;border:1px solid var(--line);color:var(--dim)}
+ .pill.on{color:#39d98a;border-color:#39d98a}
+ a.nav{color:#2AABEE;text-decoration:none;font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <h1>مدیریت نظرها <b>پالس ایران ۲۴</b></h1>
+ <p><a class="nav" href="/tahlil-admin">← پنل تحلیل صوتی</a> &nbsp;·&nbsp; <a class="nav" href="/admin">پنل خبر</a></p>
+
+ <div id="login" class="card">
+   <label>رمز ورود</label>
+   <input id="pw" type="password" autocomplete="current-password" placeholder="ADMIN_TOKEN">
+   <button id="loginBtn">ورود</button>
+   <div id="loginMsg" class="msg"></div>
+ </div>
+
+ <div id="qcard" class="card hidden">
+   <h3>صف تأیید</h3>
+   <div class="hint">تا وقتی تأیید نکنی، هیچ‌کدام روی سایت دیده نمی‌شوند.</div>
+   <div id="queue"></div>
+ </div>
+
+ <div id="mcard" class="card hidden">
+   <h3>نظرهای منتشرشده — حذف</h3>
+   <div class="hint">برای حذف نظری که قبلاً تأیید شده، تحلیل را انتخاب کن.</div>
+   <label>تحلیل</label>
+   <select id="tsel"></select>
+   <button id="loadBtn">نمایش نظرها</button>
+   <div id="mlist"></div>
+ </div>
+</div>
+<script>
+(function(){
+  var token = sessionStorage.getItem('pi24_admin') || '';
+  function el(id){ return document.getElementById(id); }
+
+  function api(action, extra){
+    var payload = Object.assign({action:action}, extra||{});
+    return fetch('/tahlil-comments-admin/api', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify(payload)
+    }).then(function(r){ return r.json().then(function(j){ j._status=r.status; return j; }); });
+  }
+
+  function showApp(){
+    el('login').classList.add('hidden');
+    el('qcard').classList.remove('hidden');
+    el('mcard').classList.remove('hidden');
+    loadQueue(); loadTahlils();
+  }
+
+  function doLogin(){
+    token = el('pw').value.trim();
+    if(!token){ return; }
+    el('loginMsg').textContent='در حال بررسی...'; el('loginMsg').className='msg';
+    api('login').then(function(j){
+      if(j.ok){ sessionStorage.setItem('pi24_admin', token); el('loginMsg').textContent=''; showApp(); }
+      else { el('loginMsg').textContent = j._status===503 ? 'ADMIN_TOKEN تنظیم نشده' : 'رمز اشتباه است'; el('loginMsg').className='msg err'; }
+    }).catch(function(){ el('loginMsg').textContent='خطای شبکه'; el('loginMsg').className='msg err'; });
+  }
+
+  function rowEl(c, tid, approved){
+    var d=document.createElement('div'); d.className='row';
+    var top=document.createElement('div'); top.className='top';
+    var b=document.createElement('b'); b.textContent=c.name||'بی‌نام';
+    var s=document.createElement('small');
+    s.textContent=String(c.ts||'').slice(0,10)+'  ·  /tahlil/'+tid;
+    top.appendChild(b); top.appendChild(s);
+    var p=document.createElement('p'); p.textContent=c.text||'';
+    var btns=document.createElement('div'); btns.className='btns';
+    if(!approved){
+      var okb=document.createElement('button'); okb.className='go'; okb.textContent='تأیید و انتشار';
+      okb.onclick=function(){ api('approve',{tid:tid,cid:c.cid}).then(function(r){ if(r.ok){ loadQueue(); } }); };
+      btns.appendChild(okb);
+    } else {
+      var hb=document.createElement('button'); hb.className='sec'; hb.textContent='پنهان کردن';
+      hb.onclick=function(){ api('hide',{tid:tid,cid:c.cid}).then(function(r){ if(r.ok){ el('loadBtn').click(); loadQueue(); } }); };
+      btns.appendChild(hb);
+    }
+    var db=document.createElement('button'); db.className='no'; db.textContent='حذف کامل';
+    db.onclick=function(){
+      if(!confirm('این نظر برای همیشه حذف شود؟')){ return; }
+      api('delete',{tid:tid,cid:c.cid}).then(function(r){ if(r.ok){ loadQueue(); if(approved){ el('loadBtn').click(); } }});
+    };
+    btns.appendChild(db);
+    d.appendChild(top); d.appendChild(p); d.appendChild(btns);
+    return d;
+  }
+
+  function loadQueue(){
+    api('queue').then(function(j){
+      var box=el('queue'); box.innerHTML='';
+      if(!j.ok || !j.items || !j.items.length){ box.innerHTML='<p class="hint">نظر تأییدنشده‌ای وجود ندارد.</p>'; return; }
+      j.items.forEach(function(q){ box.appendChild(rowEl(q, q.tid, false)); });
+    });
+  }
+
+  function loadTahlils(){
+    api('tahlils').then(function(j){
+      var sel=el('tsel'); sel.innerHTML='';
+      if(!j.ok || !j.items){ return; }
+      j.items.forEach(function(t){
+        var o=document.createElement('option'); o.value=t.id; o.textContent=(t.title||t.id);
+        sel.appendChild(o);
+      });
+    });
+  }
+
+  el('loadBtn').onclick=function(){
+    var tid=el('tsel').value;
+    if(!tid){ return; }
+    api('list',{tid:tid}).then(function(j){
+      var box=el('mlist'); box.innerHTML='';
+      if(!j.ok || !j.items || !j.items.length){ box.innerHTML='<p class="hint">این تحلیل هنوز نظری ندارد.</p>'; return; }
+      j.items.forEach(function(c){
+        var d=rowEl(c, tid, !!c.ok);
+        var pill=document.createElement('span');
+        pill.className='pill'+(c.ok?' on':'');
+        pill.textContent=c.ok?'منتشرشده':'در انتظار';
+        d.querySelector('.top').appendChild(pill);
+        box.appendChild(d);
+      });
+    });
+  };
+
+  el('loginBtn').onclick = doLogin;
+  el('pw').addEventListener('keydown', function(e){ if(e.key==='Enter'){ doLogin(); } });
+  if(token){ api('login').then(function(j){ if(j.ok){ showApp(); } else { sessionStorage.removeItem('pi24_admin'); } }); }
+})();
+</script>
+</body>
+</html>`;
+
+/* ============================================================================
+   نصب v80 — چهار گام
+   ----------------------------------------------------------------------------
+   گام ۱ — کل این فایل را به انتهای _worker.js اضافه کن (بعد از بلوک v79).
+
+   گام ۲ — در تابع fetch، این سه خط را درست *بالای* خط
+           return env.ASSETS.fetch(request);  اضافه کن:
+
+     if (path === "/api/tahlil-comment") return handleTahlilCommentPost(request, env);
+     if (path === "/tahlil-comments-admin" || path === "/tahlil-comments-admin/") return handleTahlilCommentsAdminPage();
+     if (path === "/tahlil-comments-admin/api") return handleTahlilCommentsAdminApi(request, env);
+
+   گام ۳ — در تابع handleTahlilPageI18n (داخل بلوک v79)، این خط را پیدا کن:
+
+     <a class="home-link" href="${L.list}">${escHtml(L.allTahlil)}</a>
+
+   و درست *بالایش* این خط را اضافه کن:
+
+     ${await tahlilEngagementHtml(env, id, lang)}
+
+   ⚠️ آن خط دقیقاً یک بار در کل فایل وجود دارد و داخل handleTahlilPageI18n است.
+      خط مشابهی در handleTahlilListI18n هست ولی آن href="${L.home}" دارد — به آن دست نزن.
+
+   گام ۴ — در خط اول فایل، v79 را به v80 تغییر بده.
+
+   ----------------------------------------------------------------------------
+   تست بعد از استقرار:
+     ۱) /tahlil/1405-05-06 را باز کن — پایین صفحه دکمه ♥ و فرم نظر باید باشد
+     ۲) یک نظر آزمایشی بفرست — باید پیام «پس از بررسی منتشر می‌شود» بدهد
+        و روی صفحه دیده نشود
+     ۳) /tahlil-comments-admin را باز کن، وارد شو، نظر را تأیید کن
+     ۴) صفحه تحلیل را رفرش کن (تا ۵ دقیقه کش دارد) — نظر باید دیده شود
+     ۵) در همان پنل، بخش «نظرهای منتشرشده» → تحلیل را انتخاب کن →
+        «حذف کامل» را بزن و مطمئن شو از صفحه پاک می‌شود
+
+   نکته‌ی حقوقی: چون نظر کاربران روی سایت منتشر می‌شود، در
+   Datenschutzerklärung یک بند کوتاه لازم است: چه چیزی ذخیره می‌شود
+   (نام دلخواه و متن نظر)، چه چیزی ذخیره نمی‌شود (IP و ایمیل)،
+   و اینکه نظرها پیش از انتشار بررسی می‌شوند.
+   ============================================================================ */
