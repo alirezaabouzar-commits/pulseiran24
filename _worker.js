@@ -1,4 +1,4 @@
-/* build: v77 — رفع نمایش موجودیت‌های HTML خام مثل &#33; در متن خبر */
+/* build: v79 — رفع نمایش موجودیت‌های HTML خام مثل &#33; در متن خبر */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -65,11 +65,15 @@ export default {
     }
 
    
-   if (path === "/tahlil" || path === "/tahlil/") return handleTahlilList(url, env);
+    if (path === "/tahlil" || path === "/tahlil/") return handleTahlilListI18n(url, env, "fa");
     if (path === "/tahlil.xml") return handleTahlilFeed(env);
     if (path === "/tahlil-admin" || path === "/tahlil-admin/") return handleTahlilAdminPage();
     if (path === "/tahlil-admin/api") return handleTahlilAdminApi(request, env);
-    if (/^\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPage(url, env, path.split("/")[2]); return env.ASSETS.fetch(request);
+    if (/^\/(en|de)\/tahlil\/?$/.test(path)) return handleTahlilListI18n(url, env, path.slice(1, 3));
+    if (/^\/(en|de)\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPageI18n(url, env, path.split("/")[3], path.slice(1, 3));
+    if (/^\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPageI18n(url, env, path.split("/")[2], "fa");
+
+    return env.ASSETS.fetch(request);
   }
 };
 
@@ -1775,7 +1779,7 @@ async function handleSitemap(url, env) {
   for (const p of ["darbare.html", "khatte-mashy.html", "tashih.html"]) {
     urls.push(`  <url><loc>${SITE_ORIGIN}/${p}</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>`);
   }
-  for (const u of await tahlilSitemapUrls(env)) urls.push(u);
+  for (const u of await tahlilSitemapUrlsI18n(env)) urls.push(u);
   for (const it of index.slice(0, 2000)) {
     const id = String(it.id || "").replace(/[^0-9]/g, "");
     if (!id) continue;
@@ -2724,3 +2728,638 @@ const TAHLIL_ADMIN_HTML = `<!DOCTYPE html>
 </script>
 </body>
 </html>`;
+
+
+/* ============================================================================
+   پالس ایران ۲۴ — تحلیل صوتی سه‌زبانه  (v79)
+   ----------------------------------------------------------------------------
+   این فایل به انتهای _worker.js فعلی (v78) اضافه می‌شود — append-only.
+   هیچ تابع یا ثابتی را بازتعریف نمی‌کند و از توابع موجود استفاده می‌کند:
+     escHtml, formatFaDate, textToParagraphs, translateOne, trHash,
+     getTahlilIndex, tahlilClock, tahlilIsoDuration,
+     TAHLIL_CSS, TAHLIL_FONT, SITE_ORIGIN
+
+   ── گام ۱: کل این فایل را عیناً به انتهای _worker.js بچسبان.
+
+   ── گام ۲: در تابع fetch، این بلوک فعلی:
+
+        if (path === "/tahlil" || path === "/tahlil/") return handleTahlilList(url, env);
+        if (path === "/tahlil.xml") return handleTahlilFeed(env);
+        if (path === "/tahlil-admin" || path === "/tahlil-admin/") return handleTahlilAdminPage();
+        if (path === "/tahlil-admin/api") return handleTahlilAdminApi(request, env);
+        if (/^\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPage(url, env, path.split("/")[2]); return env.ASSETS.fetch(request);
+
+      را با این بلوک جایگزین کن:
+
+        if (path === "/tahlil" || path === "/tahlil/") return handleTahlilListI18n(url, env, "fa");
+        if (path === "/tahlil.xml") return handleTahlilFeed(env);
+        if (path === "/tahlil-admin" || path === "/tahlil-admin/") return handleTahlilAdminPage();
+        if (path === "/tahlil-admin/api") return handleTahlilAdminApi(request, env);
+        if (/^\/(en|de)\/tahlil\/?$/.test(path)) return handleTahlilListI18n(url, env, path.slice(1, 3));
+        if (/^\/(en|de)\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPageI18n(url, env, path.split("/")[3], path.slice(1, 3));
+        if (/^\/tahlil\/[A-Za-z0-9_-]{1,60}\/?$/.test(path)) return handleTahlilPageI18n(url, env, path.split("/")[2], "fa");
+
+        return env.ASSETS.fetch(request);
+
+   ── گام ۳: در تابع handleSitemap این خط:
+
+        for (const u of await tahlilSitemapUrls(env)) urls.push(u);
+
+      را به این تغییر بده:
+
+        for (const u of await tahlilSitemapUrlsI18n(env)) urls.push(u);
+
+   ── گام ۴: در خط اول فایل، v78 را به v79 تغییر بده.
+
+   ── نکته‌ی مهم درباره‌ی برگشت‌پذیری:
+      توابع قدیمی handleTahlilPage و handleTahlilList و tahlilSitemapUrls دست‌نخورده
+      باقی می‌مانند. اگر چیزی خراب شد، فقط سه خط روتر را به حالت قبل برگردان —
+      همه‌چیز مثل v78 کار می‌کند. هیچ داده‌ای در KV تغییر نمی‌کند.
+
+   ── طراحی:
+      • صدا فقط فارسی است و ترجمه نمی‌شود (تصمیم آگاهانه: مخاطب صوتی فارسی‌زبان
+        است، ارزش نسخه‌های خارجی در خوانده‌شدن و ایندکس‌شدن است).
+      • عنوان، خلاصه، متن کامل و منابع با translateOne ترجمه و در KV کش می‌شوند.
+      • زیر پلیر یک نوار: «Audio in Persian · Full text in English».
+      • زیر متن، سلب مسئولیت ترجمه‌ی ماشینی با لینک به نسخه‌ی فارسی.
+      • hreflang کامل fa/en/de/x-default روی هر سه نسخه.
+      • فید /tahlil.xml فارسی می‌ماند (فید پادکست باید به زبان خود صوت باشد).
+   ============================================================================ */
+
+/* حداکثر طول هر تکه برای ارسال به مترجم (سقف امن سرویس گوگل ۱۸۰۰ است) */
+const TAHLIL_TR_MAX = 1500;
+
+/* سقف تعداد تکه‌های ترجمه‌نشده در هر درخواست.
+   دلیل: Cloudflare Workers در پلن رایگان حداکثر ۵۰ subrequest دارد.
+   تکه‌هایی که در این نوبت جا نشوند، فارسی نمایش داده می‌شوند و در
+   بازدید بعدی ترجمه می‌شوند (گرم‌شدن تدریجی کش). بعد از یکی دو بازدید
+   همه‌چیز از KV می‌آید و دیگر هیچ ترجمه‌ای انجام نمی‌شود. */
+const TAHLIL_TR_BUDGET = 20;
+const TAHLIL_TR_BUDGET_LIST = 18;
+
+/* ---------- برچسب‌های سه‌زبانه ---------- */
+
+const TAHLIL_I18N = {
+  fa: {
+    htmlLang: "fa", dir: "rtl", locale: "fa_IR", rtl: true,
+    logo: 'پالس <b>ایران ۲۴</b>',
+    home: "/", list: "/tahlil",
+    badge: "تحلیل صوتی",
+    listH1: "شنیدن خبر، پشتِ خبر",
+    listLede: "تحلیل‌های کوتاه روزانه بر پایه منابع خبری بین‌المللی. هر قطعه متن کامل هم دارد.",
+    listTitle: "تحلیل صوتی | پالس ایران ۲۴",
+    listDesc: "تحلیل‌های صوتی روزانه پالس ایران ۲۴ بر پایه منابع خبری بین‌المللی — همراه با متن کامل.",
+    empty: "اولین تحلیل صوتی به‌زودی منتشر می‌شود.",
+    backHome: "← بازگشت به صفحه اصلی",
+    allTahlil: "← همه‌ی تحلیل‌های صوتی",
+    listen: "زمان شنیدن:",
+    play: "پخش", pause: "توقف", seek: "جای‌یابی در فایل صوتی",
+    back15: "↺ ۱۵ ثانیه", fwd15: "۱۵ ثانیه ↻", resume: "▶ ادامه از ",
+    download: "دانلود صوت",
+    fullText: "متن کامل",
+    fullTextHint: "همان متنی که در فایل صوتی خوانده شده است.",
+    sources: "منابع:",
+    audioNote: "",
+    mtNote: "",
+    pageSuffix: " | تحلیل صوتی پالس ایران ۲۴",
+    foot: "پالس ایران ۲۴ — نبض خبر ایران و جهان",
+    tgchan: "کانال تلگرام",
+    notFoundH: "این تحلیل در دسترس نیست",
+    notFoundP: "ممکن است حذف شده یا آدرس اشتباه باشد."
+  },
+  en: {
+    htmlLang: "en", dir: "ltr", locale: "en_US", rtl: false,
+    logo: 'Pulse <b>Iran 24</b>',
+    home: "/en", list: "/en/tahlil",
+    badge: "Audio analysis",
+    listH1: "The story behind the story",
+    listLede: "Short daily analysis based on international news sources. Every episode comes with a full text.",
+    listTitle: "Audio analysis | Pulse Iran 24",
+    listDesc: "Daily audio analysis from Pulse Iran 24, based on international news sources — with full transcripts.",
+    empty: "The first audio analysis will be published soon.",
+    backHome: "← Back to homepage",
+    allTahlil: "← All audio analysis",
+    listen: "Listening time:",
+    play: "Play", pause: "Pause", seek: "Seek in audio",
+    back15: "↺ 15s", fwd15: "15s ↻", resume: "▶ Resume from ",
+    download: "Download audio",
+    fullText: "Full text",
+    fullTextHint: "The text as it is read in the audio file.",
+    sources: "Sources:",
+    audioNote: "Audio in Persian · Full text in English",
+    mtNote: "Machine translation. The Persian original is the authoritative version:",
+    pageSuffix: " | Audio analysis — Pulse Iran 24",
+    foot: "Pulse Iran 24 — the pulse of news from Iran and the world",
+    tgchan: "Telegram channel",
+    notFoundH: "This analysis is not available",
+    notFoundP: "It may have been removed, or the address is wrong."
+  },
+  de: {
+    htmlLang: "de", dir: "ltr", locale: "de_DE", rtl: false,
+    logo: 'Pulse <b>Iran 24</b>',
+    home: "/de", list: "/de/tahlil",
+    badge: "Audio-Analyse",
+    listH1: "Die Geschichte hinter der Nachricht",
+    listLede: "Kurze tägliche Analysen auf Basis internationaler Nachrichtenquellen. Jede Folge hat einen Volltext.",
+    listTitle: "Audio-Analyse | Pulse Iran 24",
+    listDesc: "Tägliche Audio-Analysen von Pulse Iran 24 auf Basis internationaler Nachrichtenquellen — mit Volltext.",
+    empty: "Die erste Audio-Analyse erscheint in Kürze.",
+    backHome: "← Zur Startseite",
+    allTahlil: "← Alle Audio-Analysen",
+    listen: "Hördauer:",
+    play: "Abspielen", pause: "Pause", seek: "Im Audio navigieren",
+    back15: "↺ 15 Sek.", fwd15: "15 Sek. ↻", resume: "▶ Weiter ab ",
+    download: "Audio herunterladen",
+    fullText: "Volltext",
+    fullTextHint: "Der Text, wie er in der Audiodatei gelesen wird.",
+    sources: "Quellen:",
+    audioNote: "Audio auf Persisch · Volltext auf Deutsch",
+    mtNote: "Maschinelle Übersetzung. Maßgeblich ist die persische Originalfassung:",
+    pageSuffix: " | Audio-Analyse — Pulse Iran 24",
+    foot: "Pulse Iran 24 — der Nachrichtenpuls aus Iran und der Welt",
+    tgchan: "Telegram-Kanal",
+    notFoundH: "Diese Analyse ist nicht verfügbar",
+    notFoundP: "Sie wurde möglicherweise entfernt, oder die Adresse ist falsch."
+  }
+};
+
+function tahlilLang(l) {
+  return TAHLIL_I18N[l] ? l : "fa";
+}
+
+/* ---------- تاریخ به زبان صفحه ---------- */
+
+function tahlilDateLabel(iso, lang) {
+  if (lang === "fa") return formatFaDate(iso);
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso || "").slice(0, 10);
+    return d.toLocaleDateString(lang === "de" ? "de-DE" : "en-GB",
+      { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  } catch (e) {
+    return String(iso || "").slice(0, 10);
+  }
+}
+
+/* ---------- تکه‌کردن متن بلند برای مترجم ---------- */
+
+function tahlilChunk(text, max) {
+  const t = String(text || "").trim();
+  if (!t) return [];
+  if (t.length <= max) return [t];
+
+  const out = [];
+  let rest = t;
+  while (rest.length > max) {
+    const win = rest.slice(0, max);
+    let cut = -1;
+    for (const mark of [". ", "؟ ", "! ", "؛ ", "… ", "، "]) {
+      const i = win.lastIndexOf(mark);
+      if (i >= 0 && i + mark.length > cut) cut = i + mark.length;
+    }
+    if (cut < max * 0.4) {
+      const sp = win.lastIndexOf(" ");
+      cut = sp > max * 0.4 ? sp + 1 : max;
+    }
+    out.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) out.push(rest);
+  return out;
+}
+
+/* ---------- ترجمه با کش KV و سقف مصرف ----------
+   ابتدا همه‌ی تکه‌ها از KV خوانده می‌شوند (خواندن KV subrequest حساب نمی‌شود).
+   فقط تکه‌هایی که در کش نیستند — و آن هم تا سقف budget — واقعاً ترجمه می‌شوند.
+   بقیه فارسی می‌مانند و در بازدید بعدی ترجمه می‌شوند. */
+
+async function tahlilTranslateMany(chunks, lang, env, budget) {
+  const kv = env && env.PULSE_STATS;
+  const out = chunks.slice();
+  if (lang === "fa" || !chunks.length) return { texts: out, pending: 0 };
+
+  let hits = new Array(chunks.length).fill(null);
+  if (kv) {
+    try {
+      hits = await Promise.all(chunks.map(c =>
+        c ? kv.get("tr:" + lang + ":" + trHash(String(c).trim())).catch(() => null)
+          : Promise.resolve(null)
+      ));
+    } catch (e) { hits = new Array(chunks.length).fill(null); }
+  }
+
+  const misses = [];
+  for (let i = 0; i < chunks.length; i++) {
+    if (!chunks[i]) { out[i] = ""; continue; }
+    if (hits[i]) out[i] = hits[i];
+    else misses.push(i);
+  }
+
+  const take = misses.slice(0, Math.max(0, budget));
+  if (take.length) {
+    try {
+      const done = await Promise.all(take.map(i => translateOne(chunks[i], lang, env)));
+      take.forEach((i, k) => { out[i] = done[k] || chunks[i]; });
+    } catch (e) { /* هرچه ترجمه نشد، فارسی می‌ماند */ }
+  }
+
+  return { texts: out, pending: Math.max(0, misses.length - take.length) };
+}
+
+/* ---------- قطعات مشترک صفحه ---------- */
+
+function tahlilHeaderHtml(L) {
+  return `<header><div class="wrap">
+  <a class="logo" href="${L.home}"><img src="/assets/icon-192.png" alt="" onerror="this.style.display='none'">${L.logo}</a>
+</div></header>`;
+}
+
+function tahlilFooterHtml(L) {
+  return `<footer>${escHtml(L.foot)} · <a href="https://telegram.me/pulseiran24" target="_blank" rel="noopener">${escHtml(L.tgchan)}</a></footer>`;
+}
+
+/* کلید تعویض زبان — زبان فعلی بدون لینک نمایش داده می‌شود */
+function tahlilLangSwitch(lang, suffix) {
+  const s = suffix || "";
+  const rows = [
+    { c: "fa", label: "فارسی", href: "/tahlil" + s },
+    { c: "en", label: "English", href: "/en/tahlil" + s },
+    { c: "de", label: "Deutsch", href: "/de/tahlil" + s }
+  ];
+  const inner = rows.map(r => r.c === lang
+    ? `<span class="lsw-on">${escHtml(r.label)}</span>`
+    : `<a href="${escHtml(r.href)}">${escHtml(r.label)}</a>`
+  ).join('<i class="lsw-sep">·</i>');
+  return `<div class="lsw" dir="ltr">${inner}</div>`;
+}
+
+function tahlilAltLinks(suffix) {
+  const s = suffix || "";
+  return `<link rel="alternate" hreflang="fa" href="${SITE_ORIGIN}/tahlil${s}">
+<link rel="alternate" hreflang="en" href="${SITE_ORIGIN}/en/tahlil${s}">
+<link rel="alternate" hreflang="de" href="${SITE_ORIGIN}/de/tahlil${s}">
+<link rel="alternate" hreflang="x-default" href="${SITE_ORIGIN}/tahlil${s}">`;
+}
+
+/* استایل‌های افزوده — بقیه از TAHLIL_CSS موجود می‌آید */
+const TAHLIL_I18N_CSS = `
+  .lsw{margin:0 0 18px;font-size:.82rem;color:var(--dim);display:flex;gap:8px;align-items:center}
+  .lsw a{color:var(--tg);text-decoration:none}
+  .lsw a:hover{text-decoration:underline}
+  .lsw-on{color:var(--text);font-weight:700}
+  .lsw-sep{font-style:normal;opacity:.4}
+  .aunote{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+    color:var(--dim);font-size:.8rem}
+  .mtnote{margin-top:26px;padding:12px 14px;border:1px dashed var(--line);border-radius:10px;
+    color:var(--dim);font-size:.82rem;line-height:1.7}
+  .mtnote a{color:var(--tg);text-decoration:none}
+  .ltr .track svg{transform:none}
+  .ltr .tm{text-align:right}
+`;
+
+/* ---------- صفحه‌ی یک تحلیل، سه‌زبانه ---------- */
+
+async function handleTahlilPageI18n(url, env, id, lang) {
+  lang = tahlilLang(lang);
+  const L = TAHLIL_I18N[lang];
+  const kv = env && env.PULSE_STATS;
+  if (!kv) return tahlilNotFoundPage(lang);
+
+  let t = null;
+  try {
+    const raw = await kv.get("tahlil:" + id);
+    if (raw) t = JSON.parse(raw);
+  } catch (e) {}
+  if (!t) return tahlilNotFoundPage(lang);
+
+  const origin = url.origin;
+  const canonical = origin + (lang === "fa" ? "" : "/" + lang) + "/tahlil/" + id;
+  const audioAbs = /^https?:\/\//.test(t.audio) ? t.audio : origin + t.audio;
+  const cover = t.image || "/assets/og-image.jpg";
+  const coverAbs = /^https?:\/\//.test(cover) ? cover : origin + cover;
+
+  /* ---- ترجمه ---- */
+  const rawParas = textToParagraphs(t.transcript || "");
+  const flat = [];
+  const map = { title: -1, summary: -1, sources: -1, paras: [] };
+
+  map.title = flat.push(String(t.title || "")) - 1;
+  if (t.summary) map.summary = flat.push(String(t.summary)) - 1;
+  if (t.sources) map.sources = flat.push(String(t.sources)) - 1;
+  for (const p of rawParas) {
+    const cs = tahlilChunk(p, TAHLIL_TR_MAX);
+    const start = flat.length;
+    for (const c of cs) flat.push(c);
+    map.paras.push([start, flat.length]);
+  }
+
+  const tr = await tahlilTranslateMany(flat, lang, env, TAHLIL_TR_BUDGET);
+  const title = tr.texts[map.title] || String(t.title || "");
+  const summary = map.summary >= 0 ? (tr.texts[map.summary] || "") : "";
+  const sources = map.sources >= 0 ? (tr.texts[map.sources] || "") : "";
+  const paragraphs = map.paras.map(r => tr.texts.slice(r[0], r[1]).join(" ").trim()).filter(Boolean);
+
+  let description = String(summary || title).replace(/\s+/g, " ").trim();
+  if (description.length > 160) description = description.slice(0, 157) + "…";
+
+  const dlName = (t.filename && t.filename.trim())
+    ? t.filename.trim()
+    : (String(t.title || "").replace(/[\\/:*?"<>|]/g, "").trim().slice(0, 80) + ".mp3");
+
+  const bodyHtml = paragraphs.map(p => "<p>" + escHtml(p) + "</p>").join("\n");
+
+  const waShare = "https://wa.me/?text=" + encodeURIComponent(title + "\n" + canonical + "\n\n📡 Pulse Iran 24 | https://pulseiran24.com");
+  const tgShare = "https://t.me/share/url?url=" + encodeURIComponent(canonical) + "&text=" + encodeURIComponent(title);
+  const xShare = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(title) + "&url=" + encodeURIComponent(canonical);
+
+  /* JSON-LD — زبان صوت همیشه فارسی است. متن کامل فقط در نسخه‌ی فارسی
+     به‌عنوان transcript اعلام می‌شود، چون در en/de یک ترجمه است نه رونوشت. */
+  const ldObj = {
+    "@context": "https://schema.org",
+    "@type": "AudioObject",
+    "name": title,
+    "description": description,
+    "contentUrl": audioAbs,
+    "encodingFormat": "audio/mpeg",
+    "duration": tahlilIsoDuration(t.duration),
+    "uploadDate": t.date,
+    "datePublished": t.date,
+    "inLanguage": "fa-IR",
+    "url": canonical,
+    "thumbnailUrl": coverAbs,
+    "publisher": {
+      "@type": "NewsMediaOrganization",
+      "name": "Pulse Iran 24",
+      "url": SITE_ORIGIN,
+      "logo": { "@type": "ImageObject", "url": SITE_ORIGIN + "/assets/icon-512.png" }
+    }
+  };
+  if (lang === "fa" && t.transcript) ldObj.transcript = t.transcript;
+  const ld = JSON.stringify(ldObj).replace(/</g, "\\u003c");
+
+  const faUrl = SITE_ORIGIN + "/tahlil/" + id;
+  const mtBlock = (lang === "fa" || !L.mtNote) ? "" :
+    `<div class="mtnote">${escHtml(L.mtNote)} <a href="${escHtml(faUrl)}" hreflang="fa">${escHtml(faUrl)}</a></div>`;
+  const auNote = (lang === "fa" || !L.audioNote) ? "" :
+    `<div class="aunote">${escHtml(L.audioNote)}</div>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="${L.htmlLang}" dir="${L.dir}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escHtml(title)}${escHtml(L.pageSuffix)}</title>
+<meta name="description" content="${escHtml(description)}">
+<link rel="canonical" href="${escHtml(canonical)}">
+${tahlilAltLinks("/" + id)}
+<meta name="theme-color" content="#0D1117">
+<link rel="icon" href="/assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Pulse Iran 24">
+<meta property="og:title" content="${escHtml(title)}">
+<meta property="og:description" content="${escHtml(description)}">
+<meta property="og:url" content="${escHtml(canonical)}">
+<meta property="og:image" content="${escHtml(coverAbs)}">
+<meta property="og:audio" content="${escHtml(audioAbs)}">
+<meta property="og:locale" content="${L.locale}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escHtml(title)}">
+<meta name="twitter:description" content="${escHtml(description)}">
+<meta name="twitter:image" content="${escHtml(coverAbs)}">
+${TAHLIL_FONT}
+<script type="application/ld+json">${ld}</script>
+<style>${TAHLIL_CSS}${TAHLIL_I18N_CSS}</style>
+</head>
+<body class="${L.rtl ? "rtl" : "ltr"}">
+${tahlilHeaderHtml(L)}
+<main class="wrap">
+  ${tahlilLangSwitch(lang, "/" + id)}
+  <div class="art-meta">
+    <span class="badge">${escHtml(L.badge)}</span>
+    <span>${escHtml(tahlilDateLabel(t.date, lang))}</span>
+    <span>${escHtml(L.listen)} ${escHtml(tahlilClock(t.duration))}</span>
+  </div>
+  <h1>${escHtml(title)}</h1>
+  ${summary ? `<p class="lede">${escHtml(summary)}</p>` : ""}
+
+  <div class="player">
+    <audio id="au" src="${escHtml(t.audio)}" preload="metadata"></audio>
+    <div class="prow">
+      <button class="playbtn" id="pb" aria-label="${escHtml(L.play)}">▶</button>
+      <div class="track" id="tk" role="slider" tabindex="0" aria-label="${escHtml(L.seek)}"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <svg viewBox="0 0 300 36" preserveAspectRatio="none" aria-hidden="true">
+          <path class="base" d="M0 18H112l8-12 11 24 9-12H300"/>
+          <path class="prog" id="pg" d="M0 18H112l8-12 11 24 9-12H300"/>
+        </svg>
+      </div>
+      <span class="tm" id="tm">0:00 / ${escHtml(tahlilClock(t.duration))}</span>
+    </div>
+    <div class="tools">
+      <button class="chip" id="rs" style="display:none"></button>
+      <button class="chip" id="bk">${escHtml(L.back15)}</button>
+      <button class="chip" id="fw">${escHtml(L.fwd15)}</button>
+      <button class="chip" data-rate="1" aria-pressed="true">1×</button>
+      <button class="chip" data-rate="1.25" aria-pressed="false">1.25×</button>
+      <button class="chip" data-rate="1.5" aria-pressed="false">1.5×</button>
+      <a class="chip" style="text-decoration:none" href="${escHtml(t.audio)}" download="${escHtml(dlName)}">${escHtml(L.download)}</a>
+    </div>
+    <div class="fname">🎧 ${escHtml(dlName)}</div>
+    ${auNote}
+  </div>
+
+  ${bodyHtml ? `<h2>${escHtml(L.fullText)}</h2>
+  <p class="hint">${escHtml(L.fullTextHint)}</p>
+  <div class="art-body">${bodyHtml}</div>` : ""}
+
+  ${sources ? `<div class="srcs"><b>${escHtml(L.sources)}</b> ${escHtml(sources)}</div>` : ""}
+  ${mtBlock}
+
+  <div class="actions">
+    <a class="wa" href="${escHtml(waShare)}" target="_blank" rel="noopener">WhatsApp</a>
+    <a class="tg" href="${escHtml(tgShare)}" target="_blank" rel="noopener">Telegram</a>
+    <a class="x" href="${escHtml(xShare)}" target="_blank" rel="noopener">X</a>
+  </div>
+  <a class="home-link" href="${L.list}">${escHtml(L.allTahlil)}</a>
+</main>
+${tahlilFooterHtml(L)}
+<script>
+(function(){
+  var a=document.getElementById('au'),pb=document.getElementById('pb'),
+      pg=document.getElementById('pg'),tm=document.getElementById('tm'),
+      tk=document.getElementById('tk'),L=1000,total=${parseInt(t.duration, 10) || 0};
+  var RTL=${L.rtl ? "true" : "false"};
+  var LB=${JSON.stringify(L.play)},LP=${JSON.stringify(L.pause)},LR=${JSON.stringify(L.resume)};
+  var ID=${JSON.stringify(String(id))},KEY='pi24_tahlil_'+ID;
+  function fmt(s){s=Math.max(0,Math.floor(s||0));
+    var h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=String(s%60).padStart(2,'0');
+    return h?(h+':'+String(m).padStart(2,'0')+':'+ss):(m+':'+ss);}
+  function dur(){return (isFinite(a.duration)&&a.duration)||total||0;}
+  function draw(){var d=dur(),r=d?a.currentTime/d:0;
+    pg.style.strokeDashoffset=String(L-L*r);
+    tm.textContent=fmt(a.currentTime)+' / '+fmt(d);
+    tk.setAttribute('aria-valuenow',String(Math.round(r*100)));}
+  pb.onclick=function(){if(a.paused){a.play();}else{a.pause();}};
+  a.onplay=function(){pb.textContent='❚❚';pb.setAttribute('aria-label',LP);};
+  a.onpause=function(){pb.textContent='▶';pb.setAttribute('aria-label',LB);};
+  a.ontimeupdate=draw;a.onloadedmetadata=draw;
+  a.onended=function(){a.currentTime=0;};
+  tk.onclick=function(e){var b=tk.getBoundingClientRect();
+    var r=(e.clientX-b.left)/b.width; if(RTL){r=1-r;}
+    a.currentTime=Math.min(Math.max(r,0),1)*dur();};
+  tk.onkeydown=function(e){
+    var back=RTL?'ArrowRight':'ArrowLeft', fwd=RTL?'ArrowLeft':'ArrowRight';
+    if(e.key===fwd){a.currentTime=a.currentTime+5;e.preventDefault();}
+    if(e.key===back){a.currentTime=Math.max(0,a.currentTime-5);e.preventDefault();}
+    if(e.key===' '){pb.click();e.preventDefault();}};
+  document.getElementById('bk').onclick=function(){a.currentTime=Math.max(0,a.currentTime-15);};
+  document.getElementById('fw').onclick=function(){a.currentTime=Math.min(dur(),a.currentTime+15);};
+  function savePos(){try{
+    if(a.currentTime>20&&a.currentTime<dur()-20){localStorage.setItem(KEY,String(Math.floor(a.currentTime)));}
+    else{localStorage.removeItem(KEY);}
+  }catch(e){}}
+  setInterval(function(){if(!a.paused){savePos();}},5000);
+  a.addEventListener('pause',savePos);
+  a.addEventListener('ended',function(){try{localStorage.removeItem(KEY);}catch(e){}});
+  var saved=0;try{saved=parseInt(localStorage.getItem(KEY)||'0',10)||0;}catch(e){}
+  if(saved>20){
+    var rs=document.getElementById('rs');
+    rs.textContent=LR+fmt(saved);
+    rs.style.display='';
+    rs.onclick=function(){a.currentTime=saved;a.play();rs.style.display='none';};
+  }
+  var chips=document.querySelectorAll('[data-rate]');
+  for(var i=0;i<chips.length;i++){(function(c){
+    c.onclick=function(){a.playbackRate=parseFloat(c.getAttribute('data-rate'));
+      for(var j=0;j<chips.length;j++){chips[j].setAttribute('aria-pressed',String(chips[j]===c));}};
+  })(chips[i]);}
+  draw();
+})();
+</script>
+</body>
+</html>`;
+
+  /* اگر هنوز بخشی ترجمه نشده، کش کوتاه بگذار تا بازدید بعدی کامل شود */
+  const maxAge = tr.pending > 0 ? 30 : 300;
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=UTF-8", "Cache-Control": "public, max-age=" + maxAge }
+  });
+}
+
+/* ---------- فهرست تحلیل‌ها، سه‌زبانه ---------- */
+
+async function handleTahlilListI18n(url, env, lang) {
+  lang = tahlilLang(lang);
+  const L = TAHLIL_I18N[lang];
+  const index = await getTahlilIndex(env);
+
+  const rows = index.slice(0, 60);
+  let titles = rows.map(i => String(i.title || ""));
+  if (lang !== "fa" && titles.length) {
+    const tr = await tahlilTranslateMany(titles, lang, env, TAHLIL_TR_BUDGET_LIST);
+    titles = tr.texts;
+  }
+
+  const items = rows.map((i, k) =>
+    `<li><a href="${L.list}/${escHtml(i.id)}"><strong>${escHtml(titles[k] || i.title)}</strong>` +
+    `<span>${escHtml(tahlilClock(i.duration))} · ${escHtml(tahlilDateLabel(i.date, lang))}</span></a></li>`
+  ).join("\n");
+
+  const canonical = SITE_ORIGIN + L.list;
+  const mtBlock = (lang === "fa" || !L.mtNote) ? "" :
+    `<div class="mtnote">${escHtml(L.mtNote)} <a href="${SITE_ORIGIN}/tahlil" hreflang="fa">${SITE_ORIGIN}/tahlil</a></div>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="${L.htmlLang}" dir="${L.dir}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escHtml(L.listTitle)}</title>
+<meta name="description" content="${escHtml(L.listDesc)}">
+<link rel="canonical" href="${escHtml(canonical)}">
+${tahlilAltLinks("")}
+<link rel="alternate" type="application/rss+xml" title="Pulse Iran 24 — Audio" href="${SITE_ORIGIN}/tahlil.xml">
+<meta name="theme-color" content="#0D1117">
+<link rel="icon" href="/assets/favicon.ico" sizes="any">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pulse Iran 24">
+<meta property="og:title" content="${escHtml(L.listTitle)}">
+<meta property="og:description" content="${escHtml(L.listDesc)}">
+<meta property="og:url" content="${escHtml(canonical)}">
+<meta property="og:locale" content="${L.locale}">
+${TAHLIL_FONT}
+<style>${TAHLIL_CSS}${TAHLIL_I18N_CSS}</style>
+</head>
+<body class="${L.rtl ? "rtl" : "ltr"}">
+${tahlilHeaderHtml(L)}
+<main class="wrap">
+  ${tahlilLangSwitch(lang, "")}
+  <div class="art-meta"><span class="badge">${escHtml(L.badge)}</span></div>
+  <h1>${escHtml(L.listH1)}</h1>
+  <p class="lede">${escHtml(L.listLede)}</p>
+  ${items ? `<ul class="tlist">${items}</ul>` : `<p class="empty">${escHtml(L.empty)}</p>`}
+  ${mtBlock}
+  <a class="home-link" href="${L.home}">${escHtml(L.backHome)}</a>
+</main>
+${tahlilFooterHtml(L)}
+</body>
+</html>`;
+
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=UTF-8", "Cache-Control": "public, max-age=180" }
+  });
+}
+
+/* ---------- صفحه‌ی «یافت نشد» به زبان صفحه ---------- */
+
+function tahlilNotFoundPage(lang) {
+  const L = TAHLIL_I18N[tahlilLang(lang)];
+  const html = `<!DOCTYPE html>
+<html lang="${L.htmlLang}" dir="${L.dir}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 | Pulse Iran 24</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/assets/favicon.ico" sizes="any">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;font-family:'Vazirmatn',Tahoma,sans-serif;background:#0D1117;color:#E9EDF2;
+    display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px}
+  h1{font-size:1.3rem;margin-bottom:10px}
+  p{color:#8B96A5;margin-bottom:22px}
+  a{color:#FF2D4A;font-weight:700;text-decoration:none}
+</style>
+</head>
+<body>
+  <div>
+    <h1>${escHtml(L.notFoundH)}</h1>
+    <p>${escHtml(L.notFoundP)}</p>
+    <a href="${L.list}">${escHtml(L.allTahlil)}</a>
+  </div>
+</body>
+</html>`;
+  return new Response(html, { status: 404, headers: { "Content-Type": "text/html; charset=UTF-8" } });
+}
+
+/* ---------- ورودی‌های sitemap برای هر سه زبان ---------- */
+
+async function tahlilSitemapUrlsI18n(env) {
+  const index = await getTahlilIndex(env);
+  const out = [];
+  for (const p of ["/tahlil", "/en/tahlil", "/de/tahlil"]) {
+    out.push(`  <url><loc>${SITE_ORIGIN}${p}</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`);
+  }
+  for (const i of index.slice(0, 300)) {
+    const lm = (i.date && !isNaN(Date.parse(i.date))) ? new Date(i.date).toISOString() : null;
+    for (const p of ["/tahlil/", "/en/tahlil/", "/de/tahlil/"]) {
+      out.push(
+        `  <url><loc>${SITE_ORIGIN}${p}${i.id}</loc>` +
+        (lm ? `<lastmod>${lm}</lastmod>` : "") +
+        `<changefreq>monthly</changefreq><priority>${p === "/tahlil/" ? "0.7" : "0.6"}</priority></url>`
+      );
+    }
+  }
+  return out;
+}
