@@ -1,4 +1,4 @@
-/* build: v82 — کاهش شدید نوشتن در KV (سقف رایگان: ۱۰۰۰ put در روز) */
+/* build: v83 — فیلتر پست‌های بی‌محتوا از آرشیو، sitemap و rss */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -53,6 +53,31 @@ async function edgePut(key, body, ttl, ctx) {
     if (ctx && ctx.waitUntil) ctx.waitUntil(caches.default.put(req, resp));
     else await caches.default.put(req, resp);
   } catch (e) {}
+}
+
+/* ============================================================
+   v83 — فیلتر پست‌های بی‌محتوا
+   پست‌هایی که فقط یک کلمه یا چند ایموجی‌اند (مثل «نتانیاهو» یا «ترامپ:»)
+   از آرشیو، sitemap و rss کنار گذاشته می‌شوند؛ گوگل آن‌ها را
+   «محتوای کم‌ارزش» می‌شمارد. صفحه‌ی /news/{id} همچنان کار می‌کند،
+   فقط در فهرست‌ها نمایش داده نمی‌شود.
+   برای سخت‌گیرتر یا آزادتر شدن، فقط همین عدد را تغییر بده.
+   ============================================================ */
+const MIN_POST_CHARS = 20;
+
+/* طول متن واقعی، بدون لینک، ایموجی، نشانه‌گذاری و فاصله */
+function meaningfulLength(text) {
+  let s = String(text || "");
+  s = s.replace(/https?:\/\/\S+/g, " ");                 /* لینک‌ها */
+  s = s.replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/g, ""); /* نویسه‌های نامرئی */
+  s = s.replace(/[\u2190-\u2BFF\uFE0F]/g, " ");           /* فلش و نمادها */
+  try { s = s.replace(/[\u{1F000}-\u{1FAFF}]/gu, " "); } catch (e) {} /* ایموجی */
+  s = s.replace(/[\s.,،؛:!?؟«»"'()\[\]{}\-–—_*#@|/\\]+/g, ""); /* نشانه‌گذاری */
+  return s.length;
+}
+
+function isThinPost(text) {
+  return meaningfulLength(text) < MIN_POST_CHARS;
 }
 
 /* نوشتن کم‌تکرار در KV: حداکثر یک‌بار در هر بازه (ثانیه) در هر isolate */
@@ -556,7 +581,7 @@ function scheduleArticleCache(env, ctx, posts) {
         const existing = await kv.get("article:" + id);
         if (!existing) await kv.put("article:" + id, JSON.stringify(p));
       } catch (e) {}
-      if (!seen.has(id)) {
+      if (!seen.has(id) && !isThinPost(p.text)) {
         seen.add(id);
         index.push({ id: id, text: (p.text || "").slice(0, 220), published: p.published || null, photo: p.photo || null });
         changed = true;
@@ -577,6 +602,8 @@ async function handleArchive(url, env) {
   let index = [];
   try { index = JSON.parse(await kv.get("article_index") || "[]"); } catch (e) { index = []; }
   if (!Array.isArray(index)) index = [];
+  /* v83: پست‌های بی‌محتوا در آرشیو نمایش داده نمی‌شوند */
+  index = index.filter(x => !isThinPost(x && x.text));
   const q = (url.searchParams.get("q") || "").trim().toLowerCase();
   const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
   const pageSize = 20;
@@ -831,6 +858,7 @@ async function handleNewsSitemap(env) {
     if (!id) continue;
     const t = Date.parse(p.published || "");
     if (isNaN(t) || t < cutoff) continue;
+    if (isThinPost(p.text)) continue; /* v83 */
     const { title } = splitTitleBody(p.text);
     items.push(
       `  <url>\n` +
@@ -1881,6 +1909,7 @@ async function handleSitemap(url, env) {
   for (const it of index.slice(0, 2000)) {
     const id = String(it.id || "").replace(/[^0-9]/g, "");
     if (!id) continue;
+    if (isThinPost(it.text)) continue; /* v83 */
     const lm = (it.published && !isNaN(Date.parse(it.published))) ? new Date(it.published).toISOString() : null;
     urls.push(
       `  <url><loc>${SITE_ORIGIN}/news/${id}</loc>` +
@@ -1910,6 +1939,7 @@ async function handleRss(url, env) {
   const items = index.slice(0, 40).map(it => {
     const id = String(it.id || "").replace(/[^0-9]/g, "");
     if (!id) return "";
+    if (isThinPost(it.text)) return ""; /* v83 */
     const raw = String(it.text || "").trim();
     const nl = raw.indexOf("\n");
     const title = (nl === -1 ? raw : raw.slice(0, nl)).slice(0, 140) || "خبر پالس ایران ۲۴";
