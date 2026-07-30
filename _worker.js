@@ -118,6 +118,11 @@ export default {
     if (path === "/news-sitemap.xml") return handleNewsSitemap(env);
     if (path === "/rss.xml" || path === "/feed.xml") return handleRss(url, env);
     if (path === "/robots.txt") return handleRobots(request, env);
+    if (path === "/api/corrections") return corrApi(request, env);
+    if (path === "/tashih-log-admin") return corrAdminPage(request, env);
+    if (path === "/tashih" || path === "/tashih.html") return corrTashihPage(request, env);
+
+
     if (request.method === "POST" && path === "/") return handleContact(request, env);
     if (request.method === "GET" && (path === "/" || path === "/index.html")) {
       return handleHome(request, env, ctx, "fa");
