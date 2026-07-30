@@ -120,7 +120,7 @@ export default {
     if (path === "/robots.txt") return handleRobots(request, env);
     if (path === "/api/corrections") return corrApi(request, env);
     if (path === "/tashih-log-admin") return corrAdminPage(request, env);
-    if (path === "/tashih" || path === "/tashih.html") return corrTashihPage(request, env);
+    if (path === "/tashih") return corrTashihPage(request, env);
 
 
     if (request.method === "POST" && path === "/") return handleContact(request, env);
@@ -4388,7 +4388,7 @@ async function corrApi(request, env) {
 // تزریق سیاهه در tashih.html به‌جای <!--CORR_LOG-->
 async function corrTashihPage(request, env) {
   const assetUrl = new URL(request.url);
-  assetUrl.pathname = '/tashih.html';
+  assetUrl.pathname = '/tashih';
   let res;
   try {
     res = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
