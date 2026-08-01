@@ -80,11 +80,11 @@ function isThinPost(text) {
   return meaningfulLength(text) < MIN_POST_CHARS;
 }
 
-/* v84: تیزرهای تلگرام که به خود سایت لینک می‌دهند وارد سایت نشوند.
-   بدون این فیلتر، از پست تیزر تلگرام یک کارت تکراری و بی‌محتوا
-   روی صفحه‌ی اصلی ساخته می‌شود که «ادامه مطلب» آن چیزی ندارد. */
+/* v85: فقط تیزرهایی حذف شوند که به یک صفحه‌ی خبر مشخص لینک می‌دهند
+   (مثل pulseiran24.com/news/123). امضای معمولی کانال که فقط دامنه را
+   دارد دست‌نخورده می‌ماند — v84 خیلی گسترده بود و همه‌ی پست‌ها را حذف کرد. */
 function isSelfPromoPost(text) {
-  return /pulseiran24\.com/i.test(String(text || ""));
+  return /pulseiran24\.com\/news\//i.test(String(text || ""));
 }
 
 /* نوشتن کم‌تکرار در KV: حداکثر یک‌بار در هر بازه (ثانیه) در هر isolate */
@@ -413,7 +413,7 @@ function parsePosts(html) {
     if (!textM) continue;
     const text = cleanText(textM[1]);
     if (!text) continue;
-    if (isSelfPromoPost(text)) continue;   /* v84 */
+    if (isSelfPromoPost(text)) continue;   /* v85 */
     let link = linkM ? linkM[1] : "https://t.me/pulseiran24";
     if (!/^https:\/\/t\.me\//.test(link)) link = "https://t.me/pulseiran24";
     /* دامنه پشتیبان — لینک‌ها حتی هنگام اختلال t.me هم کار کنند */
@@ -611,7 +611,7 @@ async function handleArchive(url, env) {
   try { index = JSON.parse(await kv.get("article_index") || "[]"); } catch (e) { index = []; }
   if (!Array.isArray(index)) index = [];
   /* v83: پست‌های بی‌محتوا در آرشیو نمایش داده نمی‌شوند */
-  index = index.filter(x => x && !isThinPost(x.text) && !isSelfPromoPost(x.text)); /* v84 */
+  index = index.filter(x => x && !isThinPost(x.text) && !isSelfPromoPost(x.text)); /* v85 */
   const q = (url.searchParams.get("q") || "").trim().toLowerCase();
   const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
   const pageSize = 20;
