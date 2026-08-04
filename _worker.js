@@ -1,4 +1,4 @@
-/* build: v83 — فیلتر پست‌های بی‌محتوا از آرشیو، sitemap و rss */
+/* build: v86 — اصلاح صفحه‌ی خبر برای پست‌های تک‌پاراگرافی (متن کامل در بدنه) */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -1036,8 +1036,32 @@ function splitTitleBody(rawText) {
   const text = String(rawText || "");
   const idx = text.indexOf("\n");
   let title, rest;
-  if (idx === -1) { title = text.trim(); rest = ""; }
-  else { title = text.slice(0, idx).trim(); rest = text.slice(idx + 1); }
+  if (idx !== -1) {
+    title = text.slice(0, idx).trim();
+    rest = text.slice(idx + 1);
+  } else {
+    /* v86: پستی که اصلاً خط جدید ندارد. قبلاً کل متن «تیتر» می‌شد، در ۱۴۰ نویسه
+       بریده می‌شد و بدنه خالی می‌ماند — یعنی صفحه‌ی /news/{id} فقط نیمه‌ی اول
+       خبر را نشان می‌داد. حالا تیتر از پایان اولین جمله جدا می‌شود و بقیه‌ی
+       متن کامل به بدنه می‌رود. */
+    const t = text.trim();
+    let cut = -1;
+    if (t.length > 140) {
+      for (let i = 30; i < Math.min(t.length, 220); i++) {
+        const ch = t.charAt(i);
+        if (ch === "." || ch === "؟" || ch === "!" || ch === "؛") { cut = i + 1; break; }
+      }
+    }
+    if (cut > 0) {
+      title = t.slice(0, cut).trim();
+      rest  = t.slice(cut).trim();
+    } else {
+      title = t;
+      /* اگر جای مناسبی برای برش پیدا نشد ولی متن بلند است، متن کامل را در
+         بدنه نگه دار تا چیزی از دست نرود. */
+      rest = t.length > 140 ? t : "";
+    }
+  }
   if (!title) title = "خبر پالس ایران ۲۴";
   if (title.length > 140) title = title.slice(0, 140) + "…";
   return { title, paragraphs: textToParagraphs(rest) };
