@@ -80,11 +80,19 @@ function isThinPost(text) {
   return meaningfulLength(text) < MIN_POST_CHARS;
 }
 
-/* v85: فقط تیزرهایی حذف شوند که به یک صفحه‌ی خبر مشخص لینک می‌دهند
-   (مثل pulseiran24.com/news/123). امضای معمولی کانال که فقط دامنه را
-   دارد دست‌نخورده می‌ماند — v84 خیلی گسترده بود و همه‌ی پست‌ها را حذف کرد. */
+/* v86: تشخیص «تیزر» بر اساس لینک تنها کافی نیست.
+   از مردادماه ۱۴۰۵ لینک صفحه‌ی خبر ته همه‌ی پست‌های کانال گذاشته می‌شود،
+   بنابراین v85 (که هر پستِ دارای pulseiran24.com/news/ را حذف می‌کرد)
+   عملاً تمام خبرها را حذف می‌کرد و سایت خالی می‌ماند.
+   حالا پست فقط وقتی تیزر حساب می‌شود که علاوه بر لینک،
+   متن واقعی‌اش هم کوتاه باشد — یعنی چیزی جز خودِ لینک ندارد.
+   meaningfulLength لینک‌ها را حذف می‌کند، پس این عدد فقط متن واقعی است. */
+const SELF_PROMO_MAX_CHARS = 60;
+
 function isSelfPromoPost(text) {
-  return /pulseiran24\.com\/news\//i.test(String(text || ""));
+  const s = String(text || "");
+  if (!/pulseiran24\.com\/news\//i.test(s)) return false;
+  return meaningfulLength(s) < SELF_PROMO_MAX_CHARS;
 }
 
 /* نوشتن کم‌تکرار در KV: حداکثر یک‌بار در هر بازه (ثانیه) در هر isolate */
@@ -413,7 +421,10 @@ function parsePosts(html) {
     if (!textM) continue;
     const text = cleanText(textM[1]);
     if (!text) continue;
-    if (isSelfPromoPost(text)) continue;   /* v85 */
+    /* v86: فیلتر تیزر از اینجا برداشته شد و به fetchLivePosts منتقل شد.
+       دلیل: اگر فیلتر همه‌ی پست‌ها را حذف کند، parsePosts آرایه‌ی خالی
+       برمی‌گرداند و fetchLivePosts آن را «تلگرام در دسترس نیست» می‌فهمد
+       و به دامنه‌ی بعدی می‌رود. نتیجه‌اش خاموشی کل بخش خبر بود. */
     let link = linkM ? linkM[1] : "https://t.me/pulseiran24";
     if (!/^https:\/\/t\.me\//.test(link)) link = "https://t.me/pulseiran24";
     /* دامنه پشتیبان — لینک‌ها حتی هنگام اختلال t.me هم کار کنند */
@@ -556,7 +567,11 @@ async function fetchLivePosts() {
       if (!r.ok) throw new Error(new URL(tgUrl).hostname + " " + r.status);
       const posts = parsePosts(await r.text());
       if (!posts.length) throw new Error(new URL(tgUrl).hostname + " no posts");
-      return posts;
+      /* v86: تیزرها اینجا کنار گذاشته می‌شوند، نه داخل parsePosts.
+         شبکه‌ی ایمنی: اگر فیلتر همه را حذف کرد، فهرست فیلترنشده
+         برگردانده می‌شود. هیچ فیلتری نباید بخش خبر را خاموش کند. */
+      const kept = posts.filter(p => !isSelfPromoPost(p.text));
+      return kept.length ? kept : posts;
     } catch (e) {
       errors.push(String(e && e.message || e));
     }
