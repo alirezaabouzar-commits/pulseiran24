@@ -395,10 +395,46 @@ async function handleWorldCup(url, env, ctx) {
 
 /* ---------- خبرها از تلگرام ---------- */
 
+/* v89: موجودیت‌های HTML نام‌دار که تلگرام و فیدها می‌فرستند.
+   قبلاً فقط موجودیت‌های عددی (&#33;) و چند مورد پایه رمزگشایی می‌شد،
+   بنابراین &rlm; خام روی سایت چاپ می‌شد. &zwnj; (نیم‌فاصله) از آن هم
+   مهم‌تر است، چون اگر رمزگشایی نشود متن فارسی به‌هم می‌ریزد. */
+const NAMED_ENTITIES = {
+  rlm: "\u200F", lrm: "\u200E", zwnj: "\u200C", zwj: "\u200D",
+  shy: "\u00AD", thinsp: "\u2009", ensp: "\u2002", emsp: "\u2003",
+  hellip: "…", mdash: "—", ndash: "–", minus: "−",
+  laquo: "«", raquo: "»", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”",
+  bull: "•", middot: "·", deg: "°", times: "×", divide: "÷",
+  euro: "€", pound: "£", yen: "¥", copy: "©", reg: "®", trade: "™",
+  hearts: "♥", star: "★", check: "✓", dagger: "†", permil: "‰"
+};
+
+function decodeNamed(s) {
+  return String(s).replace(/&([a-zA-Z]+);/g, (m, name) => {
+    const key = name.toLowerCase();
+    return Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, key) ? NAMED_ENTITIES[key] : m;
+  });
+}
+
+/* v89: لینکِ خودِ سایت و امضای کانال از متن خبر برداشته می‌شود.
+   روی سایت این لینک به خودِ همان صفحه اشاره می‌کند و دکمه‌ی
+   «ادامه مطلب» همان کار را انجام می‌دهد، پس فقط نویز است و
+   چون طولانی است از کادر کارت هم بیرون می‌زند.
+   توجه: این تابع باید بعد از isSelfPromoPost اجرا شود، وگرنه
+   فیلتر تیزر دیگر لینکی برای تشخیص پیدا نمی‌کند. */
+function stripSelfSignature(text) {
+  let s = String(text || "");
+  s = s.replace(/(?:https?:\/\/)?(?:www\.)?pulseiran24\.com\/news\/\d+/gi, "");
+  s = s.replace(/^[ \t]*#pulseiran24[ \t]*$/gim, "");
+  s = s.replace(/^[ \t]*@pulseiran24[ \t]*(?:\|[ \t]*(?:https?:\/\/)?(?:www\.)?pulseiran24\.com[ \t]*)?$/gim, "");
+  s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+  return s.trim();
+}
+
 function cleanText(raw) {
-  return raw
+  return decodeNamed(raw
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^>]+>/g, ""))
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&nbsp;/g, " ")
     /* هر موجودیت عددی HTML دیگر (مثل &#33; برای «!») که تلگرام گاهی به‌جای کاراکتر خام می‌فرستد */
@@ -571,7 +607,9 @@ async function fetchLivePosts() {
          شبکه‌ی ایمنی: اگر فیلتر همه را حذف کرد، فهرست فیلترنشده
          برگردانده می‌شود. هیچ فیلتری نباید بخش خبر را خاموش کند. */
       const kept = posts.filter(p => !isSelfPromoPost(p.text));
-      return kept.length ? kept : posts;
+      const out = kept.length ? kept : posts;
+      /* v89: بعد از فیلتر، لینک خودارجاع و امضا از متن پاک می‌شود */
+      return out.map(p => ({ ...p, text: stripSelfSignature(p.text) }));
     } catch (e) {
       errors.push(String(e && e.message || e));
     }
@@ -1166,7 +1204,11 @@ async function fetchSingleTelegramPost(id) {
       });
       if (!r.ok) continue;
       const posts = parsePosts(await r.text());
-      if (posts && posts.length) return posts[0];
+      if (posts && posts.length) {
+        /* v89: همان پاک‌سازی مسیر اصلی، تا صفحه‌ی /news/{id} هم لینک خودارجاع نداشته باشد */
+        const p = posts[0];
+        return { ...p, text: stripSelfSignature(p.text) };
+      }
     } catch (e) { /* دامنه‌ی بعدی */ }
   }
   return null;
