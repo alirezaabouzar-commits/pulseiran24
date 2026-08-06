@@ -430,6 +430,16 @@
     flex-direction: column;
     gap: 10px;
     transition: transform 0.15s ease, border-color 0.15s ease;
+    /* خانه‌های گرید به‌صورت پیش‌فرض کوچک‌تر از محتوایشان نمی‌شوند،
+       بنابراین یک لینک بلندِ بدون فاصله کارت را از کادر بیرون می‌برد.
+       min-width:0 آن قفل را باز می‌کند و overflow-wrap متن را می‌شکند. */
+    min-width: 0;
+  }
+  .news-card h3,
+  .news-card p,
+  .news-card a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .news-card:hover {
     transform: translateY(-3px);
