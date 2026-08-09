@@ -1,4 +1,4 @@
-/* build: v87 — تیتر از پایان اولین جمله جدا می‌شود؛ متن کامل خبر در بدنه می‌ماند */
+/* build: v90 — سایت‌مپ حالا jarayed.html، rooydad.html و podcast.html را هم شامل می‌شود */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -1997,7 +1997,7 @@ async function handleSitemap(url, env) {
   /* صفحات ثابت شفافیت و حقوقی */
   urls.push(`  <url><loc>${SITE_ORIGIN}/en</loc><changefreq>hourly</changefreq><priority>0.8</priority></url>`);
   urls.push(`  <url><loc>${SITE_ORIGIN}/de</loc><changefreq>hourly</changefreq><priority>0.8</priority></url>`);
-  for (const p of ["darbare.html", "khatte-mashy.html", "tashih.html"]) {
+  for (const p of ["darbare.html", "khatte-mashy.html", "tashih.html", "jarayed.html", "rooydad.html", "podcast.html"]) {
     urls.push(`  <url><loc>${SITE_ORIGIN}/${p}</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>`);
   }
   for (const u of await tahlilSitemapUrlsI18n(env)) urls.push(u);
