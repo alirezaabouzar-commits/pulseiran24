@@ -89,16 +89,14 @@
    به‌ترتیب امتحان می‌شود؛ اولی سایت خودت، بقیه پشتیبان.
    با ?src=... در آدرس هم می‌شود بازنویسی کرد. */
 const SOURCES = [
-  "/api/news",                          // وقتی فایل روی خود سایت باشد (بهترین حالت)
+  "/.netlify/functions/news",                          // اندپوینت واقعی خبر سایت
   "/rss.xml",
-  "https://pulseiran24.com/api/news",   // وقتی از روی دیسک باز شود (نیاز به پروکسی)
-  "https://pulseiran24.com/rss.xml",
-  "https://telegram.me/s/pulseiran24"   // پشتیبان نهایی
+  "https://pulseiran24.com/.netlify/functions/news",   // وقتی فایل از روی دیسک باز شود
+  "https://pulseiran24.com/rss.xml"
 ];
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
-  u => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u),
-  u => "https://corsproxy.io/?" + encodeURIComponent(u)
+  u => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u)
 ];
 const MAX = 12, REFRESH = 5 * 60 * 1000;
 
@@ -116,11 +114,17 @@ function parse(text, url){
     if (text.trim().startsWith("{") || text.trim().startsWith("[")) {
       const j = JSON.parse(text);
       const arr = Array.isArray(j) ? j
-        : (j.items || j.news || j.posts || j.data || j.results || []);
+        : (j.posts || j.items || j.news || j.data || j.results || []);
       arr.forEach(x => {
-        const t = clean(String(
+        let t = clean(String(
           (x && (x.title || x.headline || x.text || x.summary)) || x || ""
         ));
+        if (t.length > 120) {                       // فقط جمله‌ی اول، نه کل متن خبر
+          const cut = t.slice(0, 120);
+          const p = Math.max(cut.lastIndexOf("."), cut.lastIndexOf("؟"),
+                             cut.lastIndexOf("!"), cut.lastIndexOf("،"));
+          t = (p > 40 ? cut.slice(0, p) : cut) + "…";
+        }
         if (t && t.length > 8) out.push(t);
       });
     } else if (text.includes("<item") || text.includes("<entry")) {
@@ -139,10 +143,14 @@ function parse(text, url){
 }
 
 async function tryFetch(url){
-  const attempts = [url, ...PROXIES.map(p => p(url))];
+  // برای آدرس هم‌ریشه پروکسی لازم نیست
+  const attempts = url.startsWith("/") ? [url] : [url, ...PROXIES.map(p => p(url))];
   for (const a of attempts){
     try {
-      const r = await fetch(a, { cache: "no-store" });
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 6000);
+      const r = await fetch(a, { cache: "no-store", signal: ctl.signal });
+      clearTimeout(timer);
       if (!r.ok) continue;
       const txt = await r.text();
       const items = parse(txt, url);
