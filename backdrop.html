@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse Iran 24 — پس‌زمینه‌ی لایو</title>
+<style>
+  :root{
+    --brand:#8C1D18;
+    --gold:#C9A227;
+    --bg:#0B0D12;
+    --scale:1;          /* بزرگ‌نمایی کلی — با ?size=1.2 تغییر می‌کند */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;background:var(--bg);overflow:hidden;
+    font-family:'Vazirmatn','IRANSans',Tahoma,system-ui,sans-serif;
+    cursor:none}
+  #stage{width:100%;height:100%;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:calc(3vh * var(--scale));
+    padding:4vh 5vw;text-align:center;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(140,29,24,.28), transparent 60%),
+      var(--bg)}
+  #stage.mirror{transform:scaleX(-1)}
+
+  .logo{width:calc(16vh * var(--scale));height:calc(16vh * var(--scale));
+    border-radius:22%;object-fit:cover;
+    box-shadow:0 0 0 3px var(--gold), 0 12px 40px rgba(0,0,0,.6)}
+  .brand{font-size:calc(5.2vh * var(--scale));font-weight:800;color:#fff;
+    letter-spacing:.5px;line-height:1.1}
+  .brand b{color:var(--gold)}
+  .site{font-size:calc(4.4vh * var(--scale));color:#fff;direction:ltr;
+    background:var(--brand);padding:.28em 1em;border-radius:999px;
+    border:2px solid var(--gold);letter-spacing:1px;font-weight:700}
+
+  .rule{width:min(70%,900px);height:3px;border:0;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+
+  .head{max-width:92%;min-height:calc(14vh * var(--scale));
+    display:flex;align-items:center;justify-content:center}
+  .head span{font-size:calc(4vh * var(--scale));color:#fff;line-height:1.55;
+    opacity:0;transition:opacity .6s ease;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+  .head span.on{opacity:1}
+
+  .foot{position:absolute;bottom:3vh;display:flex;align-items:center;
+    gap:14px;color:var(--gold);font-size:calc(2.6vh * var(--scale))}
+  .dot{width:.7em;height:.7em;border-radius:50%;background:#FF3B30;
+    animation:blink 1.5s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <img class="logo" id="logo" src="/logo.png" alt=""
+       onerror="this.src='https://pulseiran24.com/logo.png'">
+  <div class="brand">پالس ایران <b>۲۴</b></div>
+  <div class="site">pulseiran24.com</div>
+  <hr class="rule">
+  <div class="head"><span id="h" class="on">نبض خبر ایران و جهان — لحظه به لحظه</span></div>
+  <div class="foot"><i class="dot"></i><span id="clock">--:--</span></div>
+</div>
+
+<script>
+const SOURCES = [
+  "/.netlify/functions/news",
+  "/rss.xml",
+  "https://pulseiran24.com/.netlify/functions/news",
+  "https://pulseiran24.com/rss.xml"
+];
+const PROXIES = [
+  u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+  u => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u)
+];
+const MAX = 10, REFRESH = 5 * 60 * 1000;
+
+const q = new URLSearchParams(location.search);
+if (q.get("size"))   document.documentElement.style.setProperty("--scale", q.get("size"));
+if (q.get("mirror") === "1") document.getElementById("stage").classList.add("mirror");
+const HOLD = (parseFloat(q.get("hold")) || 9) * 1000;   // ثانیه‌ی نمایش هر تیتر
+
+const clean = s => s.replace(/<[^>]*>/g," ").replace(/&[a-z]+;/gi," ")
+  .replace(/https?:\/\/\S+/g,"").replace(/\s+/g," ").trim();
+
+function shorten(t){
+  if (t.length <= 110) return t;
+  const cut = t.slice(0,110);
+  const p = Math.max(cut.lastIndexOf("."),cut.lastIndexOf("؟"),
+                     cut.lastIndexOf("!"),cut.lastIndexOf("،"));
+  return (p > 40 ? cut.slice(0,p) : cut) + "…";
+}
+
+function parse(text){
+  const out = [];
+  try{
+    const t = text.trim();
+    if (t.startsWith("{") || t.startsWith("[")){
+      const j = JSON.parse(t);
+      const arr = Array.isArray(j) ? j : (j.posts || j.items || j.news || []);
+      arr.forEach(x => {
+        const v = clean(String((x && (x.title || x.text || x.summary)) || x || ""));
+        if (v.length > 12) out.push(shorten(v));
+      });
+    } else if (t.includes("<item") || t.includes("<entry")){
+      new DOMParser().parseFromString(t,"text/xml")
+        .querySelectorAll("item title, entry title").forEach(n => {
+          const v = clean(n.textContent);
+          if (v.length > 12) out.push(shorten(v));
+        });
+    }
+  }catch(e){}
+  return out.filter((v,i,a)=>a.indexOf(v)===i).slice(0,MAX);
+}
+
+async function grab(url){
+  const tries = url.startsWith("/") ? [url] : [url, ...PROXIES.map(p=>p(url))];
+  for (const a of tries){
+    try{
+      const c = new AbortController();
+      const timer = setTimeout(()=>c.abort(), 6000);
+      const r = await fetch(a,{cache:"no-store",signal:c.signal});
+      clearTimeout(timer);
+      if (!r.ok) continue;
+      const items = parse(await r.text());
+      if (items.length) return items;
+    }catch(e){}
+  }
+  return [];
+}
+
+let HEADLINES = ["نبض خبر ایران و جهان — لحظه به لحظه، بدون وقفه"];
+let idx = 0;
+
+async function load(){
+  for (const s of SOURCES){
+    const items = await grab(s);
+    if (items.length){ HEADLINES = items; idx = 0; return; }
+  }
+}
+
+function rotate(){
+  const el = document.getElementById("h");
+  el.classList.remove("on");
+  setTimeout(() => {
+    el.textContent = HEADLINES[idx % HEADLINES.length];
+    idx++;
+    el.classList.add("on");
+  }, 600);
+}
+
+function tick(){
+  const n = new Date();
+  document.getElementById("clock").textContent =
+    String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
+}
+
+tick(); setInterval(tick, 20000);
+load(); setInterval(load, REFRESH);
+setInterval(rotate, HOLD);
+</script>
+</body>
+</html>
