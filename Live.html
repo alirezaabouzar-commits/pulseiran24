@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse Iran 24 — نوار خبر لایو</title>
+<style>
+  /* ============ تنظیمات سریع ============
+     برای جابه‌جا کردن نوار: مقدار --bar-bottom را کم/زیاد کن
+     (تیک‌تاک پایین صفحه را با کامنت‌ها می‌پوشاند)      */
+  :root{
+    --brand:#8C1D18;      /* قرمز برند */
+    --gold:#C9A227;       /* خط طلایی */
+    --ink:#0E1016;
+    --text:#FFFFFF;
+    --bar-h:78px;         /* ارتفاع نوار */
+    --bar-bottom:20%;     /* فاصله از پایین صفحه */
+    --speed:38s;          /* سرعت حرکت متن */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;background:transparent;overflow:hidden;
+    font-family:'Vazirmatn','IRANSans',Tahoma,system-ui,sans-serif}
+
+  .bar{
+    position:absolute;left:0;right:0;bottom:var(--bar-bottom);
+    height:var(--bar-h);display:flex;align-items:stretch;
+    background:linear-gradient(90deg,rgba(14,16,22,.94),rgba(140,29,24,.94));
+    border-top:3px solid var(--gold);
+    box-shadow:0 -6px 24px rgba(0,0,0,.35);
+    direction:rtl;
+  }
+
+  /* نشان سایت — سمت راست */
+  .badge{
+    flex:0 0 auto;display:flex;align-items:center;gap:10px;
+    padding:0 18px;background:var(--brand);
+    border-left:3px solid var(--gold);
+  }
+  .badge img{height:44px;width:44px;border-radius:10px;object-fit:cover;background:#fff}
+  .badge .site{display:flex;flex-direction:column;line-height:1.15}
+  .badge .site b{color:#fff;font-size:19px;letter-spacing:.3px;direction:ltr}
+  .badge .site span{color:var(--gold);font-size:12.5px}
+  .live{display:inline-flex;align-items:center;gap:6px;color:#fff;font-size:12.5px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#FF3B30;
+    animation:blink 1.4s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+  /* متن متحرک */
+  .track{flex:1 1 auto;overflow:hidden;position:relative;display:flex;align-items:center}
+  .move{display:inline-flex;white-space:nowrap;will-change:transform;
+    animation:slide var(--speed) linear infinite}
+  .move:hover{animation-play-state:paused}
+  @keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  .item{color:var(--text);font-size:26px;padding:0 30px;display:inline-flex;align-items:center;gap:12px}
+  .item::before{content:"";width:9px;height:9px;border-radius:50%;
+    background:var(--gold);flex:0 0 auto}
+
+  /* ساعت — سمت چپ */
+  .clock{
+    flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;
+    align-items:center;padding:0 16px;background:rgba(0,0,0,.35);
+    border-right:1px solid rgba(255,255,255,.15);min-width:96px
+  }
+  .clock b{color:#fff;font-size:24px;direction:ltr;letter-spacing:1px}
+  .clock span{color:var(--gold);font-size:11.5px}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="badge">
+    <img id="logo" src="/logo.png" onerror="this.src='https://pulseiran24.com/logo.png'" alt="">
+    <div class="site">
+      <b>pulseiran24.com</b>
+      <span class="live"><i class="dot"></i> پخش زنده</span>
+    </div>
+  </div>
+
+  <div class="track"><div class="move" id="move">
+    <span class="item">در حال دریافت آخرین اخبار…</span>
+  </div></div>
+
+  <div class="clock"><b id="t">--:--</b><span id="d">—</span></div>
+</div>
+
+<script>
+/* ===== منبع خبر =====
+   به‌ترتیب امتحان می‌شود؛ اولی سایت خودت، بقیه پشتیبان.
+   با ?src=... در آدرس هم می‌شود بازنویسی کرد. */
+const SOURCES = [
+  "/api/news",                          // وقتی فایل روی خود سایت باشد (بهترین حالت)
+  "/rss.xml",
+  "https://pulseiran24.com/api/news",   // وقتی از روی دیسک باز شود (نیاز به پروکسی)
+  "https://pulseiran24.com/rss.xml",
+  "https://telegram.me/s/pulseiran24"   // پشتیبان نهایی
+];
+const PROXIES = [
+  u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+  u => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u),
+  u => "https://corsproxy.io/?" + encodeURIComponent(u)
+];
+const MAX = 12, REFRESH = 5 * 60 * 1000;
+
+const params = new URLSearchParams(location.search);
+if (params.get("src")) SOURCES.unshift(params.get("src"));
+if (params.get("speed")) document.documentElement.style.setProperty("--speed", params.get("speed") + "s");
+if (params.get("bottom")) document.documentElement.style.setProperty("--bar-bottom", params.get("bottom"));
+
+const clean = s => s.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;/gi, " ")
+  .replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim();
+
+function parse(text, url){
+  const out = [];
+  try {
+    if (text.trim().startsWith("{") || text.trim().startsWith("[")) {
+      const j = JSON.parse(text);
+      const arr = Array.isArray(j) ? j
+        : (j.items || j.news || j.posts || j.data || j.results || []);
+      arr.forEach(x => {
+        const t = clean(String(
+          (x && (x.title || x.headline || x.text || x.summary)) || x || ""
+        ));
+        if (t && t.length > 8) out.push(t);
+      });
+    } else if (text.includes("<item") || text.includes("<entry")) {
+      const doc = new DOMParser().parseFromString(text, "text/xml");
+      doc.querySelectorAll("item title, entry title").forEach(n => {
+        const t = clean(n.textContent); if (t) out.push(t);
+      });
+    } else {
+      const doc = new DOMParser().parseFromString(text, "text/html");
+      doc.querySelectorAll(".tgme_widget_message_text").forEach(n => {
+        const t = clean(n.textContent); if (t && t.length > 12) out.push(t);
+      });
+    }
+  } catch(e){}
+  return out.filter((v,i,a) => a.indexOf(v) === i).slice(0, MAX);
+}
+
+async function tryFetch(url){
+  const attempts = [url, ...PROXIES.map(p => p(url))];
+  for (const a of attempts){
+    try {
+      const r = await fetch(a, { cache: "no-store" });
+      if (!r.ok) continue;
+      const txt = await r.text();
+      const items = parse(txt, url);
+      if (items.length) return items;
+    } catch(e){}
+  }
+  return [];
+}
+
+async function load(){
+  for (const s of SOURCES){
+    const items = await tryFetch(s);
+    if (items.length){ render(items); return; }
+  }
+  render(["پالس ایران ۲۴ — اخبار لحظه‌ای ایران و جهان",
+          "برای مطالعه کامل خبرها: pulseiran24.com"]);
+}
+
+function render(items){
+  const html = items.map(t => `<span class="item">${t}</span>`).join("");
+  document.getElementById("move").innerHTML = html + html;
+}
+
+function tick(){
+  const now = new Date();
+  document.getElementById("t").textContent =
+    String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
+  try {
+    document.getElementById("d").textContent =
+      new Intl.DateTimeFormat("fa-IR",{day:"numeric",month:"long"}).format(now);
+  } catch(e){ document.getElementById("d").textContent = ""; }
+}
+
+tick(); setInterval(tick, 20000);
+load(); setInterval(load, REFRESH);
+</script>
+</body>
+</html>
