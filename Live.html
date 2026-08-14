@@ -15,7 +15,7 @@
     --text:#FFFFFF;
     --bar-h:78px;         /* ارتفاع نوار */
     --bar-bottom:20%;     /* فاصله از پایین صفحه */
-    --speed:38s;          /* سرعت حرکت متن */
+    --pps:55;             /* سرعت: پیکسل بر ثانیه — کمتر = آرام‌تر */
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{width:100%;height:100%;background:transparent;overflow:hidden;
@@ -47,11 +47,12 @@
 
   /* متن متحرک */
   .track{flex:1 1 auto;overflow:hidden;position:relative;display:flex;align-items:center}
-  .move{display:inline-flex;white-space:nowrap;will-change:transform;
-    animation:slide var(--speed) linear infinite}
+  .move{display:inline-flex;white-space:nowrap;will-change:transform;direction:ltr;
+    animation:slide 40s linear infinite}
   .move:hover{animation-play-state:paused}
-  @keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
-  .item{color:var(--text);font-size:26px;padding:0 30px;display:inline-flex;align-items:center;gap:12px}
+  @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .item{color:var(--text);font-size:26px;padding:0 30px;display:inline-flex;align-items:center;gap:12px;
+    direction:rtl;unicode-bidi:isolate}
   .item::before{content:"";width:9px;height:9px;border-radius:50%;
     background:var(--gold);flex:0 0 auto}
 
@@ -103,7 +104,7 @@ const MAX = 12, REFRESH = 5 * 60 * 1000;
 
 const params = new URLSearchParams(location.search);
 if (params.get("src")) SOURCES.unshift(params.get("src"));
-if (params.get("speed")) document.documentElement.style.setProperty("--speed", params.get("speed") + "s");
+if (params.get("pps")) document.documentElement.style.setProperty("--pps", params.get("pps"));
 if (params.get("bottom")) document.documentElement.style.setProperty("--bar-bottom", params.get("bottom"));
 
 const clean = s => s.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;/gi, " ")
@@ -162,7 +163,15 @@ async function load(){
 
 function render(items){
   const html = items.map(t => `<span class="item">${t}</span>`).join("");
-  document.getElementById("move").innerHTML = html + html;
+  const move = document.getElementById("move");
+  move.innerHTML = html + html;
+  // مدت حرکت را از طولِ واقعی متن حساب کن تا سرعت همیشه یکنواخت بماند
+  requestAnimationFrame(() => {
+    const pps = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue("--pps")) || 55;
+    const dur = Math.max(20, (move.scrollWidth / 2) / pps);
+    move.style.animationDuration = dur.toFixed(1) + "s";
+  });
 }
 
 function tick(){
