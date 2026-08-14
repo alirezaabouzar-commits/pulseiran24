@@ -46,7 +46,7 @@
   @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
 
   /* متن متحرک */
-  .track{flex:1 1 auto;overflow:hidden;position:relative;display:flex;align-items:center}
+  .track{flex:1 1 auto;overflow:hidden;position:relative;display:flex;align-items:center;direction:ltr}
   .move{display:inline-flex;white-space:nowrap;will-change:transform;direction:ltr;
     animation:slide 40s linear infinite}
   .move:hover{animation-play-state:paused}
@@ -172,13 +172,17 @@ async function load(){
 function render(items){
   const html = items.map(t => `<span class="item">${t}</span>`).join("");
   const move = document.getElementById("move");
-  move.innerHTML = html + html;
-  // مدت حرکت را از طولِ واقعی متن حساب کن تا سرعت همیشه یکنواخت بماند
+  move.innerHTML = html;
   requestAnimationFrame(() => {
+    // اگر متن کوتاه‌تر از عرض نوار باشد، آن‌قدر تکرار کن که حلقه بی‌وقفه بماند
+    const need = move.parentElement.clientWidth;
+    let guard = 0;
+    while (move.scrollWidth < need * 2 && guard++ < 12) move.innerHTML += html;
+    const one = move.scrollWidth;
+    move.innerHTML += move.innerHTML;          // نسخه‌ی دوم برای حلقه‌ی بدون پرش
     const pps = parseFloat(getComputedStyle(document.documentElement)
       .getPropertyValue("--pps")) || 55;
-    const dur = Math.max(20, (move.scrollWidth / 2) / pps);
-    move.style.animationDuration = dur.toFixed(1) + "s";
+    move.style.animationDuration = Math.max(20, one / pps).toFixed(1) + "s";
   });
 }
 
