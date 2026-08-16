@@ -4,200 +4,184 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pulse Iran 24 — نوار خبر لایو</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-  /* ============ تنظیمات سریع ============
-     برای جابه‌جا کردن نوار: مقدار --bar-bottom را کم/زیاد کن
-     (تیک‌تاک پایین صفحه را با کامنت‌ها می‌پوشاند)      */
+  /* ====== تنظیم سریع (یا با پارامتر آدرس) ======
+     ?pps=45      سرعت، پیکسل بر ثانیه (کمتر = آرام‌تر)
+     ?bottom=220  فاصله نوار از پایین صفحه، پیکسل
+     ?h=78        ارتفاع نوار
+     ?src=...     آدرس فید خبر (اختیاری)
+  */
   :root{
-    --brand:#8C1D18;      /* قرمز برند */
-    --gold:#C9A227;       /* خط طلایی */
+    --brand:#8C1D18;
+    --gold:#C9A227;
     --ink:#0E1016;
     --text:#FFFFFF;
-    --bar-h:78px;         /* ارتفاع نوار */
-    --bar-bottom:20%;     /* فاصله از پایین صفحه */
-    --pps:55;             /* سرعت: پیکسل بر ثانیه — کمتر = آرام‌تر */
+    --bar-h:78px;
+    --bar-bottom:200px;
+    --pps:45;
   }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{width:100%;height:100%;background:transparent;overflow:hidden;
-    font-family:'Vazirmatn','IRANSans',Tahoma,system-ui,sans-serif}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:transparent;overflow:hidden}
+  body{font-family:'Vazirmatn',Tahoma,sans-serif}
 
   .bar{
-    position:absolute;left:0;right:0;bottom:var(--bar-bottom);
-    height:var(--bar-h);display:flex;align-items:stretch;
-    background:linear-gradient(90deg,rgba(14,16,22,.94),rgba(140,29,24,.94));
+    position:fixed; right:0; left:0; bottom:var(--bar-bottom);
+    height:var(--bar-h);
+    display:flex; align-items:stretch;
+    background:linear-gradient(180deg,rgba(14,16,22,.92),rgba(14,16,22,.98));
     border-top:3px solid var(--gold);
-    box-shadow:0 -6px 24px rgba(0,0,0,.35);
+    box-shadow:0 -6px 24px rgba(0,0,0,.45);
     direction:rtl;
   }
 
-  /* نشان سایت — سمت راست */
+  /* ---- نشان کانال (سمت راست) ---- */
   .badge{
-    flex:0 0 auto;display:flex;align-items:center;gap:10px;
-    padding:0 18px;background:var(--brand);
-    border-left:3px solid var(--gold);
+    flex:0 0 auto; display:flex; align-items:center; gap:12px;
+    padding:0 22px 0 26px;
+    background:linear-gradient(180deg,#A32420,var(--brand));
+    color:#fff;
+    clip-path:polygon(0 0,100% 0,calc(100% - 22px) 100%,0 100%);
   }
-  .badge img{height:44px;width:44px;border-radius:10px;object-fit:cover;background:#fff}
-  .badge .site{display:flex;flex-direction:column;line-height:1.15}
-  .badge .site b{color:#fff;font-size:19px;letter-spacing:.3px;direction:ltr}
-  .badge .site span{color:var(--gold);font-size:12.5px}
-  .live{display:inline-flex;align-items:center;gap:6px;color:#fff;font-size:12.5px}
-  .dot{width:9px;height:9px;border-radius:50%;background:#FF3B30;
-    animation:blink 1.4s infinite}
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  .badge .name{font-weight:900;font-size:23px;letter-spacing:.2px;line-height:1.15}
+  .badge .site{font-weight:500;font-size:14px;opacity:.9;direction:ltr;unicode-bidi:isolate}
+  .ecg{width:52px;height:34px;flex:0 0 auto}
+  .ecg path{
+    fill:none;stroke:var(--gold);stroke-width:3;
+    stroke-linecap:round;stroke-linejoin:round;
+    stroke-dasharray:120;stroke-dashoffset:120;
+    animation:beat 2.1s linear infinite;
+  }
+  @keyframes beat{to{stroke-dashoffset:-120}}
 
-  /* متن متحرک */
-  .track{flex:1 1 auto;overflow:hidden;position:relative;display:flex;align-items:center;direction:ltr}
-  .move{display:inline-flex;white-space:nowrap;will-change:transform;direction:ltr;
-    animation:slide 40s linear infinite}
-  .move:hover{animation-play-state:paused}
-  @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-  .item{color:var(--text);font-size:26px;padding:0 30px;display:inline-flex;align-items:center;gap:12px;
-    direction:rtl;unicode-bidi:isolate}
-  .item::before{content:"";width:9px;height:9px;border-radius:50%;
-    background:var(--gold);flex:0 0 auto}
+  /* ---- نوار متحرک ---- */
+  .track{position:relative;flex:1 1 auto;overflow:hidden}
+  .move{
+    position:absolute; top:0; right:0; height:100%;
+    width:max-content;
+    display:flex; align-items:center; white-space:nowrap;
+    direction:rtl; will-change:transform;
+    animation:slide 40s linear infinite;
+  }
+  /* حرکت از چپ به راست: اولِ خبر زودتر از همه دیده می‌شود */
+  @keyframes slide{
+    from{transform:translateX(0)}
+    to{transform:translateX(50%)}
+  }
+  .item{
+    flex:0 0 auto;
+    color:var(--text); font-size:26px; font-weight:500;
+    padding:0 26px; display:inline-flex; align-items:center; gap:14px;
+    direction:rtl; unicode-bidi:isolate;
+  }
+  .item::after{content:"◆";color:var(--gold);font-size:14px;opacity:.85}
 
-  /* ساعت — سمت چپ */
+  /* ---- ساعت (سمت چپ) ---- */
   .clock{
-    flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;
-    align-items:center;padding:0 16px;background:rgba(0,0,0,.35);
-    border-right:1px solid rgba(255,255,255,.15);min-width:96px
+    flex:0 0 auto; display:flex; align-items:center; gap:10px;
+    padding:0 20px; background:rgba(255,255,255,.05);
+    border-right:1px solid rgba(255,255,255,.12);
+    color:#fff; font-weight:700; font-size:22px;
+    direction:ltr; unicode-bidi:isolate;
   }
-  .clock b{color:#fff;font-size:24px;direction:ltr;letter-spacing:1px}
-  .clock span{color:var(--gold);font-size:11.5px}
+  .dot{width:10px;height:10px;border-radius:50%;background:#FF3B3B;animation:blink 1.2s infinite}
+  @keyframes blink{50%{opacity:.15}}
 </style>
 </head>
 <body>
 
 <div class="bar">
   <div class="badge">
-    <img id="logo" src="/logo.png" onerror="this.src='https://pulseiran24.com/logo.png'" alt="">
-    <div class="site">
-      <b>pulseiran24.com</b>
-      <span class="live"><i class="dot"></i> پخش زنده</span>
+    <svg class="ecg" viewBox="0 0 60 34" aria-hidden="true">
+      <path d="M1 20 H14 L19 8 L25 28 L31 14 L36 20 H59"/>
+    </svg>
+    <div>
+      <div class="name">پالس ایران ۲۴</div>
+      <div class="site">pulseiran24.com</div>
     </div>
   </div>
 
-  <div class="track"><div class="move" id="move">
-    <span class="item">در حال دریافت آخرین اخبار…</span>
-  </div></div>
+  <div class="track"><div class="move" id="move"></div></div>
 
-  <div class="clock"><b id="t">--:--</b><span id="d">—</span></div>
+  <div class="clock"><span class="dot"></span><span id="time">--:--</span></div>
 </div>
 
 <script>
-/* ===== منبع خبر =====
-   به‌ترتیب امتحان می‌شود؛ اولی سایت خودت، بقیه پشتیبان.
-   با ?src=... در آدرس هم می‌شود بازنویسی کرد. */
-const SOURCES = [
-  "/.netlify/functions/news",                          // اندپوینت واقعی خبر سایت
-  "/rss.xml",
-  "https://pulseiran24.com/.netlify/functions/news",   // وقتی فایل از روی دیسک باز شود
-  "https://pulseiran24.com/rss.xml"
-];
-const PROXIES = [
-  u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
-  u => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u)
-];
-const MAX = 12, REFRESH = 5 * 60 * 1000;
+/* ---------- پارامترهای آدرس ---------- */
+const P = new URLSearchParams(location.search);
+const root = document.documentElement.style;
+if (P.get("pps"))    root.setProperty("--pps", P.get("pps"));
+if (P.get("bottom")) root.setProperty("--bar-bottom", P.get("bottom") + "px");
+if (P.get("h"))      root.setProperty("--bar-h", P.get("h") + "px");
 
-const params = new URLSearchParams(location.search);
-if (params.get("src")) SOURCES.unshift(params.get("src"));
-if (params.get("pps")) document.documentElement.style.setProperty("--pps", params.get("pps"));
-if (params.get("bottom")) document.documentElement.style.setProperty("--bar-bottom", params.get("bottom"));
-
-const clean = s => s.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;/gi, " ")
-  .replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim();
-
-function parse(text, url){
-  const out = [];
-  try {
-    if (text.trim().startsWith("{") || text.trim().startsWith("[")) {
-      const j = JSON.parse(text);
-      const arr = Array.isArray(j) ? j
-        : (j.posts || j.items || j.news || j.data || j.results || []);
-      arr.forEach(x => {
-        let t = clean(String(
-          (x && (x.title || x.headline || x.text || x.summary)) || x || ""
-        ));
-        if (t.length > 120) {                       // فقط جمله‌ی اول، نه کل متن خبر
-          const cut = t.slice(0, 120);
-          const p = Math.max(cut.lastIndexOf("."), cut.lastIndexOf("؟"),
-                             cut.lastIndexOf("!"), cut.lastIndexOf("،"));
-          t = (p > 40 ? cut.slice(0, p) : cut) + "…";
-        }
-        if (t && t.length > 8) out.push(t);
-      });
-    } else if (text.includes("<item") || text.includes("<entry")) {
-      const doc = new DOMParser().parseFromString(text, "text/xml");
-      doc.querySelectorAll("item title, entry title").forEach(n => {
-        const t = clean(n.textContent); if (t) out.push(t);
-      });
-    } else {
-      const doc = new DOMParser().parseFromString(text, "text/html");
-      doc.querySelectorAll(".tgme_widget_message_text").forEach(n => {
-        const t = clean(n.textContent); if (t && t.length > 12) out.push(t);
-      });
-    }
-  } catch(e){}
-  return out.filter((v,i,a) => a.indexOf(v) === i).slice(0, MAX);
+/* ---------- ساعت ---------- */
+function tick(){
+  const d = new Date();
+  document.getElementById("time").textContent =
+    String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
 }
+tick(); setInterval(tick, 10000);
 
-async function tryFetch(url){
-  // برای آدرس هم‌ریشه پروکسی لازم نیست
-  const attempts = url.startsWith("/") ? [url] : [url, ...PROXIES.map(p => p(url))];
-  for (const a of attempts){
-    try {
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 6000);
-      const r = await fetch(a, { cache: "no-store", signal: ctl.signal });
-      clearTimeout(timer);
+/* ---------- متن پیش‌فرض ---------- */
+const FALLBACK = [
+  "پالس ایران ۲۴ — اخبار لحظه‌به‌لحظه ایران و جهان",
+  "آخرین خبرها را در pulseiran24.com دنبال کنید"
+];
+
+/* ---------- گرفتن تیترها ---------- */
+const FEEDS = P.get("src")
+  ? [P.get("src")]
+  : ["/rss.xml", "/feed.xml", "/rss", "/feed", "/index.xml"];
+
+async function fetchFeed(){
+  for (const url of FEEDS){
+    try{
+      const r = await fetch(url, {cache:"no-store"});
       if (!r.ok) continue;
-      const txt = await r.text();
-      const items = parse(txt, url);
-      if (items.length) return items;
-    } catch(e){}
+      const xml = new DOMParser().parseFromString(await r.text(), "text/xml");
+      const titles = [...xml.querySelectorAll("item > title, entry > title")]
+        .map(n => (n.textContent || "").trim())
+        .filter(Boolean)
+        .slice(0, 15);
+      if (titles.length) return titles;
+    }catch(e){ /* فید بعدی */ }
   }
-  return [];
+  return null;
 }
 
-async function load(){
-  for (const s of SOURCES){
-    const items = await tryFetch(s);
-    if (items.length){ render(items); return; }
-  }
-  render(["پالس ایران ۲۴ — اخبار لحظه‌ای ایران و جهان",
-          "برای مطالعه کامل خبرها: pulseiran24.com"]);
-}
-
+/* ---------- نمایش ---------- */
+let last = "";
 function render(items){
-  const html = items.map(t => `<span class="item">${t}</span>`).join("");
+  const key = items.join("|");
+  if (key === last) return;          // اگر خبری عوض نشده، حرکت را از نو شروع نکن
+  last = key;
+
+  const html = items.map(t => `<span class="item">${esc(t)}</span>`).join("");
   const move = document.getElementById("move");
-  move.innerHTML = html;
+  move.innerHTML = html + html;       // دو نسخه پشت سر هم برای حلقه بی‌درز
+
   requestAnimationFrame(() => {
-    // اگر متن کوتاه‌تر از عرض نوار باشد، آن‌قدر تکرار کن که حلقه بی‌وقفه بماند
-    const need = move.parentElement.clientWidth;
-    let guard = 0;
-    while (move.scrollWidth < need * 2 && guard++ < 12) move.innerHTML += html;
-    const one = move.scrollWidth;
-    move.innerHTML += move.innerHTML;          // نسخه‌ی دوم برای حلقه‌ی بدون پرش
     const pps = parseFloat(getComputedStyle(document.documentElement)
-      .getPropertyValue("--pps")) || 55;
-    move.style.animationDuration = Math.max(20, one / pps).toFixed(1) + "s";
+      .getPropertyValue("--pps")) || 45;
+    const dur = Math.max(20, (move.scrollWidth / 2) / pps);
+    move.style.animation = "none";
+    void move.offsetWidth;            // ری‌استارت تمیز انیمیشن
+    move.style.animation = `slide ${dur.toFixed(1)}s linear infinite`;
   });
 }
-
-function tick(){
-  const now = new Date();
-  document.getElementById("t").textContent =
-    String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
-  try {
-    document.getElementById("d").textContent =
-      new Intl.DateTimeFormat("fa-IR",{day:"numeric",month:"long"}).format(now);
-  } catch(e){ document.getElementById("d").textContent = ""; }
+function esc(s){
+  return s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 }
 
-tick(); setInterval(tick, 20000);
-load(); setInterval(load, REFRESH);
+async function refresh(){
+  const items = await fetchFeed();
+  render(items && items.length ? items : FALLBACK);
+}
+render(FALLBACK);
+refresh();
+setInterval(refresh, 5 * 60 * 1000);
 </script>
 </body>
 </html>
