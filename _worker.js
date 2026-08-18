@@ -1,4 +1,4 @@
-/* build: v90 — سایت‌مپ حالا jarayed.html، rooydad.html و podcast.html را هم شامل می‌شود */
+/* build: v91 — /news و /news/ بدون شناسه به‌جای صفحه‌ی خطا به صفحه‌ی اصلی هدایت می‌شوند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -115,6 +115,19 @@ export default {
     const path = url.pathname;
 
     if (path === "/api/worldcup") return handleWorldCup(url, env, ctx);
+
+    /* v91: /news و /news/ (و نسخه‌های /en و /de) شناسه ندارند، پس مقاله‌ای هم ندارند.
+       پیش از این handleArticle آن‌ها را می‌گرفت و صفحه‌ی «این خبر در دسترس نیست»
+       نشان می‌داد — که برای لینک‌های ناقص در تلگرام یا شبکه‌های اجتماعی بد است.
+       حالا به صفحه‌ی اصلیِ همان زبان هدایت می‌شوند. باید پیش از خط /news/ بیاید. */
+    {
+      const noIdNews = path.match(/^\/(?:(en|de)\/)?news\/?$/);
+      if (noIdNews) {
+        const dest = noIdNews[1] ? url.origin + "/" + noIdNews[1] : url.origin + "/";
+        return Response.redirect(dest, 302);
+      }
+    }
+
     if (path.startsWith("/news/")) return handleArticle(url, env, ctx);
     if (path === "/.netlify/functions/news") return handleNews(env, ctx);
     if (path === "/.netlify/functions/live") return handleLive(url);
