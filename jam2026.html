@@ -10,7 +10,8 @@
 <meta property="og:site_name" content="Pulse Iran 24">
 <meta property="og:title" content="نتایج زنده فوتبال | Pulse Iran 24">
 <meta property="og:description" content="نتایج زنده فوتبال: جام جهانی و لیگ‌های معتبر اروپا – دقیقه به دقیقه.">
-<meta property="og:url" content="https://pulseiran24.com/jam2026.html">
+<meta property="og:url" content="https://pulseiran24.com/jam2026">
+<link rel="canonical" href="https://pulseiran24.com/jam2026">
 <meta property="og:image" content="https://pulseiran24.com/assets/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -190,16 +191,16 @@
 
   <header>
     <div class="brand">
-      <h1 id="pageTitle">جام جهانی <span>۲۰۲۶</span></h1>
+      <h1 id="pageTitle">لیگ برتر <span>انگلیس</span></h1>
       <div class="channel">Pulse Iran 24 ⚽ گزارش زنده</div>
     </div>
     <div class="updated"><span class="dot" aria-hidden="true"></span><span id="updated">در حال دریافت اطلاعات…</span></div>
   </header>
 
   <nav class="daybar" id="leaguebar" aria-label="انتخاب لیگ">
-    <button class="active" data-league="wc">جام جهانی</button>
+    <button data-league="wc">جام جهانی</button>
     <button data-league="ucl">لیگ قهرمانان</button>
-    <button data-league="epl">لیگ برتر</button>
+    <button class="active" data-league="epl">لیگ برتر</button>
     <button data-league="bundesliga">بوندسلیگا</button>
     <button data-league="laliga">لالیگا</button>
     <button data-league="seriea">سری آ</button>
@@ -232,7 +233,7 @@
 const API = '/api/worldcup';
 const REFRESH_MS = 60000;
 let currentDay = 'today';
-let currentLeague = 'wc';
+let currentLeague = 'epl';
 const LEAGUE_TITLES = {
   wc: 'جام جهانی <span>۲۰۲۶</span>',
   ucl: 'لیگ قهرمانان <span>اروپا</span>',
@@ -295,7 +296,8 @@ const FA = {
   'Red Bull Salzburg':'ردبول زالتسبورگ','Shakhtar Donetsk':'شاختار دونتسک',
   'Club Brugge':'کلوب بروژ','Copenhagen':'کپنهاگ','Young Boys':'یانگ بویز'
 };
-const faTeam = n => FA[n] || n;
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const faTeam = n => esc(FA[n] || n);
 
 /* ---- Persian digits ---- */
 const faNum = s => String(s).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
@@ -339,8 +341,8 @@ function evClass(ev){
 }
 function evText(ev){
   const t=(ev.type||'').toLowerCase(), d=(ev.detail||'').toLowerCase();
-  const player = ev.player?.name || '؟';
-  const assist = ev.assist?.name;
+  const player = esc(ev.player?.name || '؟');
+  const assist = ev.assist?.name ? esc(ev.assist.name) : null;
   if (t==='goal'){
     let kind = 'گل!';
     if (d.includes('own')) kind = 'گل به خودی!';
@@ -358,9 +360,9 @@ function evText(ev){
     return `<span class="who">تعویض:</span> ${assist||'؟'} وارد شد <span class="sub">(به‌جای ${player})</span>`;
   }
   if (t==='var'){
-    return `<span class="who">بررسی VAR</span> <span class="sub">${ev.detail||''}</span>`;
+    return `<span class="who">بررسی VAR</span> <span class="sub">${esc(ev.detail||'')}</span>`;
   }
-  return `${ev.type||''} – ${player}`;
+  return `${esc(ev.type||'')} – ${player}`;
 }
 
 /* ---- match card ---- */
@@ -409,17 +411,17 @@ function renderMatch(fx){
   return `
   <article class="match ${isLive?'is-live':''}">
     <div class="match-top">
-      <span>${roundFa}</span>
+      <span>${esc(roundFa)}</span>
       ${topRight}
     </div>
     <div class="scoreline">
       <div class="team">
-        <img src="${home.logo}" alt="" loading="lazy">
+        <img src="${esc(home.logo)}" alt="" loading="lazy">
         <span class="tname">${faTeam(home.name)}</span>
       </div>
       <div class="score">${score}</div>
       <div class="team">
-        <img src="${away.logo}" alt="" loading="lazy">
+        <img src="${esc(away.logo)}" alt="" loading="lazy">
         <span class="tname">${faTeam(away.name)}</span>
       </div>
     </div>
@@ -455,7 +457,7 @@ async function load(){
   }catch(e){
     document.getElementById('app').innerHTML =
       `<div class="notice"><strong>خطا در دریافت اطلاعات.</strong><br>
-       لطفاً بررسی کنید مسیر <code>/api/worldcup</code> در Cloudflare Worker فعال و کلید API تنظیم شده باشد.</div>`;
+       ارتباط با سرور برقرار نشد. چند لحظه دیگر دوباره تلاش کنید.</div>`;
     document.getElementById('updated').textContent = 'اتصال برقرار نشد';
   }
 }
@@ -474,7 +476,7 @@ document.getElementById('leaguebar').addEventListener('click', e=>{
 /* ---- day tabs ---- */
 document.getElementById('daybar').addEventListener('click', e=>{
   const btn = e.target.closest('button'); if(!btn) return;
-  document.querySelectorAll('.daybar button').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#daybar button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   currentDay = btn.dataset.day;
   document.getElementById('app').innerHTML = '<div class="notice">در حال بارگذاری…</div>';
