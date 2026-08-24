@@ -1,4 +1,4 @@
-/* build: v92 — /api/worldcup: خطای 502 حذف شد، یک روز به‌جای سه روز، مصرف CPU کاهش یافت */
+/* build: v93 — /api/worldcup: هدرهای مرورگری برای اسپی‌ان + سه مسیر جایگزین در برابر 403 */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -335,6 +335,45 @@ function espnToFixture(ev, events) {
   };
 }
 
+/* v93: اسپی‌ان درخواست‌های بدون هدرِ مرورگری را با 403 رد می‌کند.
+   هدرهای زیر همان چیزی است که یک مرورگر واقعی می‌فرستد. */
+const ESPN_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Referer": "https://www.espn.com/soccer/scoreboard",
+  "Origin": "https://www.espn.com"
+};
+
+/* v93: سه مسیر مختلف اسپی‌ان. اگر اولی 403 داد، بعدی امتحان می‌شود.
+   شکل خروجی دومی مثل اولی است؛ سومی رویدادها را زیر content.sbData می‌گذارد. */
+const ESPN_SCOREBOARDS = [
+  (lg, d) => ESPN_BASE + "/" + lg + "/scoreboard?limit=60&dates=" + d,
+  (lg, d) => "https://site.web.api.espn.com/apis/site/v2/sports/soccer/" + lg +
+             "/scoreboard?region=us&lang=en&contentorigin=espn&limit=60&dates=" + d,
+  (lg, d) => "https://cdn.espn.com/core/soccer/scoreboard?xhr=1&league=" + lg + "&dates=" + d
+];
+
+function espnEventsOf(json) {
+  if (json && json.events) return json.events;
+  if (json && json.content && json.content.sbData && json.content.sbData.events) {
+    return json.content.sbData.events;
+  }
+  return [];
+}
+
+async function espnGet(target, ms) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms || 6000);
+  try {
+    return await fetch(target, {
+      signal: ctl.signal,
+      headers: ESPN_HEADERS,
+      cf: { cacheTtl: 60, cacheEverything: true }
+    });
+  } finally { clearTimeout(timer); }
+}
+
 async function handleWorldCup(url, env, ctx) {
   const lg = url.searchParams.get("league") || "wc";
   const espnLg = ESPN_LEAGUES[lg] || ESPN_LEAGUES.wc;
@@ -371,23 +410,26 @@ async function handleWorldCup(url, env, ctx) {
        summary جداگانه هم می‌رفت. JSON اسکوربورد اسپی‌ان برای سه روز حدود یک
        مگابایت است و در پلن رایگان (۱۰ms CPU) صرفِ پارس‌کردنش ورکر را می‌کشد.
        حالا: یک روز، سقف ۶۰ نتیجه، و حداکثر دو summary فقط برای بازی‌های زنده. */
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 6000);
-    let sbRes;
-    try {
-      sbRes = await fetch(
-        ESPN_BASE + "/" + espnLg + "/scoreboard?limit=60&dates=" + compact,
-        {
-          signal: ctl.signal,
-          headers: { "Accept": "application/json" },
-          cf: { cacheTtl: 60, cacheEverything: true }
-        }
-      );
-    } finally { clearTimeout(timer); }
-    if (!sbRes.ok) return fail("upstream " + sbRes.status);
-
-    const sb = await sbRes.json();
-    const all = sb.events || [];
+    let all = null;
+    const tried = [];
+    for (let i = 0; i < ESPN_SCOREBOARDS.length; i++) {
+      let res;
+      try {
+        res = await espnGet(ESPN_SCOREBOARDS[i](espnLg, compact), 6000);
+      } catch (e) {
+        tried.push("#" + (i + 1) + " " + ((e && e.message) || "fetch failed"));
+        continue;
+      }
+      if (!res.ok) { tried.push("#" + (i + 1) + " http " + res.status); continue; }
+      try {
+        all = espnEventsOf(await res.json());
+      } catch (e) {
+        tried.push("#" + (i + 1) + " bad json");
+        continue;
+      }
+      break;
+    }
+    if (all === null) return fail("upstream refused — " + tried.join(" | "));
 
     const LIVE = ["1H", "2H", "ET", "BT", "P", "HT", "LIVE", "INT"];
 
@@ -409,17 +451,8 @@ async function handleWorldCup(url, env, ctx) {
       if (LIVE.includes(short) && summaryBudget > 0) {
         summaryBudget--;
         try {
-          const c2 = new AbortController();
-          const t2 = setTimeout(() => c2.abort(), 4000);
-          let smRes;
-          try {
-            smRes = await fetch(ESPN_BASE + "/" + espnLg + "/summary?event=" + ev.id,
-              {
-                signal: c2.signal,
-                headers: { "Accept": "application/json" },
-                cf: { cacheTtl: 60, cacheEverything: true }
-              });
-          } finally { clearTimeout(t2); }
+          const smRes = await espnGet(
+            ESPN_BASE + "/" + espnLg + "/summary?event=" + ev.id, 4000);
           if (smRes && smRes.ok) {
             const sm = await smRes.json();
             if (sm.keyEvents && sm.keyEvents.length) {
