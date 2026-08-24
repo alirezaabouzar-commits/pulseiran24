@@ -1,4 +1,4 @@
-/* build: v91 — /news و /news/ بدون شناسه به‌جای صفحه‌ی خطا به صفحه‌ی اصلی هدایت می‌شوند */
+/* build: v92 — /api/worldcup: خطای 502 حذف شد، یک روز به‌جای سه روز، مصرف CPU کاهش یافت */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -342,67 +342,109 @@ async function handleWorldCup(url, env, ctx) {
   const off = day === "yesterday" ? -1 : day === "tomorrow" ? 1 : 0;
   const target = new Date(Date.now() + off * 86400000);
   const dateStr = target.toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+  const compact = dateStr.replace(/-/g, "");
 
   const cache = caches.default;
   const cacheKey = new Request("https://cache.pulseiran24.internal/worldcup-espn?lg=" + espnLg + "&date=" + dateStr);
-  const hit = await cache.match(cacheKey);
-  if (hit) {
-    const r = new Response(hit.body, hit);
-    r.headers.set("Access-Control-Allow-Origin", "*");
-    return r;
-  }
+
+  /* v92: cache.match بیرون از try بود. اگر خطا می‌داد، ورکر بدون هیچ پاسخی
+     می‌مرد و کلادفلر صفحه‌ی «Bad gateway» خودش را نشان می‌داد. */
+  try {
+    const hit = await cache.match(cacheKey);
+    if (hit) {
+      const r = new Response(hit.body, hit);
+      r.headers.set("Access-Control-Allow-Origin", "*");
+      return r;
+    }
+  } catch (e) {}
+
+  /* v92: پاسخ خطا با کد 200 برمی‌گردد، نه 502.
+     کلادفلر کدهای 502 و 504 را با صفحه‌ی خطای خودش جایگزین می‌کند و
+     متن خطای واقعی هرگز به مرورگر نمی‌رسد. حالا پیام داخل همان JSON است. */
+  const fail = (msg) => new Response(
+    JSON.stringify({ date: dateStr, response: [], error: String(msg) }),
+    { status: 200, headers: { ...JSON_HEADERS, "Cache-Control": "no-store" } }
+  );
 
   try {
-    /* یک روز قبل و بعد (اختلاف منطقه زمانی آمریکا/اروپا) و فیلتر بر اساس تاریخ برلین */
-    const fmt = d => d.toISOString().slice(0, 10).replace(/-/g, "");
-    const from = fmt(new Date(target.getTime() - 86400000));
-    const to = fmt(new Date(target.getTime() + 86400000));
-    const sbRes = await fetch(ESPN_BASE + "/" + espnLg + "/scoreboard?dates=" + from + "-" + to,
-      { headers: { "User-Agent": "Mozilla/5.0 (compatible; PulseIran24/1.0)" } });
-    if (!sbRes.ok) throw new Error("upstream " + sbRes.status);
+    /* v92: قبلاً یک بازه‌ی سه‌روزه گرفته می‌شد و برای هر بازی یک درخواست
+       summary جداگانه هم می‌رفت. JSON اسکوربورد اسپی‌ان برای سه روز حدود یک
+       مگابایت است و در پلن رایگان (۱۰ms CPU) صرفِ پارس‌کردنش ورکر را می‌کشد.
+       حالا: یک روز، سقف ۶۰ نتیجه، و حداکثر دو summary فقط برای بازی‌های زنده. */
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 6000);
+    let sbRes;
+    try {
+      sbRes = await fetch(
+        ESPN_BASE + "/" + espnLg + "/scoreboard?limit=60&dates=" + compact,
+        {
+          signal: ctl.signal,
+          headers: { "Accept": "application/json" },
+          cf: { cacheTtl: 60, cacheEverything: true }
+        }
+      );
+    } finally { clearTimeout(timer); }
+    if (!sbRes.ok) return fail("upstream " + sbRes.status);
+
     const sb = await sbRes.json();
     const all = sb.events || [];
 
-    const sameDay = all.filter(ev => {
-      const local = new Date(ev.date).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
-      return local === dateStr;
-    });
-
     const LIVE = ["1H", "2H", "ET", "BT", "P", "HT", "LIVE", "INT"];
+
+    /* فیلتر بر اساس تاریخ برلین (اسپی‌ان تاریخ را به وقت آمریکا می‌دهد) */
+    const sameDay = [];
+    for (const ev of all) {
+      const local = new Date(ev.date).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+      if (local === dateStr) sameDay.push(ev);
+    }
+
+    let summaryBudget = 2;
     const fixtures = [];
     for (const ev of sameDay) {
       const short = espnStatus(ev);
-      let events = [];
-      if (LIVE.includes(short) || ["FT", "AET", "PEN"].includes(short)) {
-        /* رویدادهای کامل (شامل تعویض‌ها) از summary */
+      const comp = (ev.competitions && ev.competitions[0]) || {};
+      /* گل و کارت از خودِ اسکوربورد می‌آید و هزینه‌ی اضافه ندارد */
+      let events = espnDetailsEvents(comp);
+      /* تعویض‌ها فقط در summary هستند — گران است، پس فقط برای بازی زنده */
+      if (LIVE.includes(short) && summaryBudget > 0) {
+        summaryBudget--;
         try {
-          const smRes = await fetch(ESPN_BASE + "/" + espnLg + "/summary?event=" + ev.id,
-            { headers: { "User-Agent": "Mozilla/5.0 (compatible; PulseIran24/1.0)" } });
-          if (smRes.ok) {
+          const c2 = new AbortController();
+          const t2 = setTimeout(() => c2.abort(), 4000);
+          let smRes;
+          try {
+            smRes = await fetch(ESPN_BASE + "/" + espnLg + "/summary?event=" + ev.id,
+              {
+                signal: c2.signal,
+                headers: { "Accept": "application/json" },
+                cf: { cacheTtl: 60, cacheEverything: true }
+              });
+          } finally { clearTimeout(t2); }
+          if (smRes && smRes.ok) {
             const sm = await smRes.json();
-            if (sm.keyEvents && sm.keyEvents.length) events = espnEventsFromKeyEvents(sm.keyEvents);
+            if (sm.keyEvents && sm.keyEvents.length) {
+              const full = espnEventsFromKeyEvents(sm.keyEvents);
+              if (full.length) events = full;
+            }
           }
         } catch (e) {}
-        if (!events.length) {
-          events = espnDetailsEvents((ev.competitions && ev.competitions[0]) || {});
-        }
       }
       fixtures.push(espnToFixture(ev, events));
     }
 
     const anyLive = fixtures.some(fx => LIVE.includes(fx.fixture.status.short));
-    const ttl = anyLive ? 60 : 120;
+    const ttl = anyLive ? 60 : 300;
 
     const resp = new Response(JSON.stringify({ date: dateStr, response: fixtures }), {
       headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=" + ttl }
     });
-    if (ctx && ctx.waitUntil) ctx.waitUntil(cache.put(cacheKey, resp.clone()));
-    else await cache.put(cacheKey, resp.clone());
+    try {
+      if (ctx && ctx.waitUntil) ctx.waitUntil(cache.put(cacheKey, resp.clone()));
+      else await cache.put(cacheKey, resp.clone());
+    } catch (e) {}
     return resp;
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e && e.message || e) }), {
-      status: 502, headers: JSON_HEADERS
-    });
+    return fail((e && e.message) || e);
   }
 }
 
