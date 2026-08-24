@@ -198,7 +198,6 @@
   </header>
 
   <nav class="daybar" id="leaguebar" aria-label="انتخاب لیگ">
-    <button data-league="wc">جام جهانی</button>
     <button data-league="ucl">لیگ قهرمانان</button>
     <button class="active" data-league="epl">لیگ برتر</button>
     <button data-league="bundesliga">بوندسلیگا</button>
@@ -235,7 +234,6 @@ const REFRESH_MS = 60000;
 let currentDay = 'today';
 let currentLeague = 'epl';
 const LEAGUE_TITLES = {
-  wc: 'جام جهانی <span>۲۰۲۶</span>',
   ucl: 'لیگ قهرمانان <span>اروپا</span>',
   epl: 'لیگ برتر <span>انگلیس</span>',
   bundesliga: '<span>بوندسلیگا</span>',
@@ -380,7 +378,9 @@ function renderMatch(fx){
     .replace('Round of 16','یک‌هشتم نهایی')
     .replace('Round of 32','یک‌شانزدهم نهایی')
     .replace('3rd Place Final','رده‌بندی')
-    .replace('Final','فینال');
+    .replace('Final','فینال')
+    .replace('FIFA World Cup, Group','جام جهانی – گروه')
+    .replace('Group Stage','مرحله گروهی');
 
   let topRight = isLive
     ? `<span class="badge-live">زنده</span>`
