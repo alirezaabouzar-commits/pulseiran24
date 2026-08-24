@@ -1,4 +1,4 @@
-/* build: v93 — /api/worldcup: هدرهای مرورگری برای اسپی‌ان + سه مسیر جایگزین در برابر 403 */
+/* build: v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -195,21 +195,31 @@ const ESPN_LEAGUES = {
 };
 
 function espnRound(ev) {
+  const map = {
+    "Semifinals": "Semi-finals", "Semifinal": "Semi-finals",
+    "Quarterfinals": "Quarter-finals", "Quarterfinal": "Quarter-finals",
+    "Round of 16": "Round of 16", "Round of 32": "Round of 32",
+    "Third-place match": "3rd Place Final", "Third Place": "3rd Place Final",
+    "Final": "Final"
+  };
+  const comp = (ev.competitions && ev.competitions[0]) || {};
+  /* ۱) عنوان مرحله (فقط جام‌ها این را دارند) */
   try {
-    const n = ev.competitions[0].notes;
+    const n = comp.notes;
     if (n && n.length && n[0].headline) {
       const h = n[0].headline;
-      const map = {
-        "Semifinals": "Semi-finals", "Semifinal": "Semi-finals",
-        "Quarterfinals": "Quarter-finals", "Quarterfinal": "Quarter-finals",
-        "Round of 16": "Round of 16", "Round of 32": "Round of 32",
-        "Third-place match": "3rd Place Final", "Third Place": "3rd Place Final",
-        "Final": "Final"
-      };
       for (const k in map) if (h.indexOf(k) !== -1) return map[k];
       return h;
     }
   } catch (e) {}
+  /* v94: ۲) altGameNote — مثل «FIFA World Cup, Group A» */
+  if (comp.altGameNote) {
+    for (const k in map) if (comp.altGameNote.indexOf(k) !== -1) return map[k];
+    return comp.altGameNote;
+  }
+  /* v94: ۳) نام ورزشگاه — برای لیگ‌ها که هیچ‌کدام از بالا را ندارند،
+     تا نوار بالای کارت بازی خالی نماند. */
+  if (comp.venue && comp.venue.fullName) return comp.venue.fullName;
   return "";
 }
 
@@ -244,7 +254,16 @@ function espnStatus(ev) {
   return "LIVE";
 }
 
-function espnEventsFromKeyEvents(keyEvents, homeId) {
+/* v94: در گل به خودی، ESPN تیمِ سودبرنده را ثبت می‌کند نه تیم بازیکن.
+   نتیجه: «گل به خودی! لیندلوف — برایتون» که برای یک سایت خبری غلط است.
+   اگر تیمِ خودِ بازیکن در داده باشد از آن استفاده می‌کنیم، وگرنه تیم مقابل. */
+function ownGoalTeamName(playerTeamId, creditedId, teams) {
+  if (playerTeamId && teams[playerTeamId]) return teams[playerTeamId];
+  for (const id in teams) if (id !== String(creditedId)) return teams[id];
+  return teams[creditedId] || "";
+}
+
+function espnEventsFromKeyEvents(keyEvents, teams) {
   const out = [];
   for (const ke of (keyEvents || [])) {
     const t = ((ke.type && ke.type.text) || "").toLowerCase();
@@ -262,8 +281,14 @@ function espnEventsFromKeyEvents(keyEvents, homeId) {
       if (t.indexOf("own") !== -1) detail = "Own Goal";
       else if (t.indexOf("penalty") !== -1 && t.indexOf("missed") !== -1) detail = "Missed Penalty";
       else if (t.indexOf("penalty") !== -1) detail = "Penalty";
+      let gTeam = teamName;
+      if (detail === "Own Goal" && teams) {
+        const pt = players[0] && (players[0].team && players[0].team.id ||
+                   (players[0].athlete && players[0].athlete.team && players[0].athlete.team.id));
+        gTeam = ownGoalTeamName(pt, (ke.team && ke.team.id), teams) || teamName;
+      }
       out.push({ time: { elapsed, extra }, type: "Goal", detail,
-        player: { name: p0 }, assist: { name: p1 }, team: { name: teamName } });
+        player: { name: p0 }, assist: { name: p1 }, team: { name: gTeam } });
     } else if (t.indexOf("yellow") !== -1 || t.indexOf("red") !== -1) {
       out.push({ time: { elapsed, extra }, type: "Card",
         detail: t.indexOf("red") !== -1 ? "Red Card" : "Yellow Card",
@@ -296,8 +321,13 @@ function espnDetailsEvents(comp) {
       let detail = "Normal Goal";
       if (d.ownGoal) detail = "Own Goal";
       else if (d.penaltyKick) detail = "Penalty";
+      let gTeam = teamName;
+      if (d.ownGoal) {
+        const pt = players[0] && players[0].team && players[0].team.id;
+        gTeam = ownGoalTeamName(pt, (d.team && d.team.id), teams) || teamName;
+      }
       out.push({ time: { elapsed, extra }, type: "Goal", detail,
-        player: { name: p0 }, assist: { name: p1 }, team: { name: teamName } });
+        player: { name: p0 }, assist: { name: p1 }, team: { name: gTeam } });
     } else if (d.yellowCard || d.redCard) {
       out.push({ time: { elapsed, extra }, type: "Card",
         detail: d.redCard ? "Red Card" : "Yellow Card",
@@ -376,7 +406,7 @@ async function espnGet(target, ms) {
 
 async function handleWorldCup(url, env, ctx) {
   const lg = url.searchParams.get("league") || "wc";
-  const espnLg = ESPN_LEAGUES[lg] || ESPN_LEAGUES.wc;
+  const espnLg = ESPN_LEAGUES[lg] || ESPN_LEAGUES.epl;
   const day = url.searchParams.get("day") || "today";
   const off = day === "yesterday" ? -1 : day === "tomorrow" ? 1 : 0;
   const target = new Date(Date.now() + off * 86400000);
@@ -456,7 +486,11 @@ async function handleWorldCup(url, env, ctx) {
           if (smRes && smRes.ok) {
             const sm = await smRes.json();
             if (sm.keyEvents && sm.keyEvents.length) {
-              const full = espnEventsFromKeyEvents(sm.keyEvents);
+              const tmap = {};
+              for (const c of (comp.competitors || [])) {
+                tmap[c.id] = (c.team && c.team.displayName) || "";
+              }
+              const full = espnEventsFromKeyEvents(sm.keyEvents, tmap);
               if (full.length) events = full;
             }
           }
