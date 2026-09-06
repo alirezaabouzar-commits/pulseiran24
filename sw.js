@@ -1,5 +1,5 @@
 /* ============================================================
-   Pulse Iran 24 — Service Worker (v2)
+   Pulse Iran 24 — Service Worker (v3)
    - نصب اپ روی گوشی (PWA)
    - دریافت و نمایش نوتیفیکیشن خبر فوری
    - استراتژی کش جدید: HTML همیشه از شبکه (تازه)، بقیه با
@@ -7,7 +7,7 @@
      قدیمی گیر نمی‌کند.
    ============================================================ */
 
-const CACHE = "pulse-shell-v3";   /* هر بار که خواستی کش کامل پاک شود، این عدد را زیاد کن */
+const CACHE = "pulse-shell-v4";   /* هر بار که خواستی کش کامل پاک شود، این عدد را زیاد کن */
 
 /* فقط فایل‌های واقعاً ثابت را از قبل کش می‌کنیم — HTML را عمداً کش نمی‌کنیم
    تا همیشه نسخه‌ی تازه از شبکه بیاید. */
@@ -62,7 +62,11 @@ self.addEventListener("fetch", (event) => {
     url.pathname === "/tgimg" ||
     url.pathname === "/tgvid" ||
     url.pathname === "/news" ||
-    url.pathname.startsWith("/news/")
+    url.pathname.startsWith("/news/") ||
+    /* v3: صفحه‌های تحلیل هم مثل خبر، ساخته‌ی ورکرند و نباید از کش بیایند */
+    url.pathname === "/tahlil" ||
+    url.pathname.startsWith("/tahlil/") ||
+    /^\/(en|de)\/(news|tahlil)(\/|$)/.test(url.pathname)
   ) {
     return; /* بگذار مرورگر خودش شبکه را بزند */
   }
@@ -79,9 +83,24 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE).then((c) => c.put(req, copy));
         }
         return res;
-      }).catch(() =>
-        caches.match(req).then((r) => r || caches.match("/index.html") || caches.match("/"))
-      )
+      }).catch(async () => {
+        /* v3 — رفع باگ: قبلاً caches.match(...) || caches.match(...) نوشته شده بود.
+           سمت راستِ || همیشه یک Promise است، پس همیشه truthy بود و اگر آدرس
+           در کش نبود مقدار undefined به respondWith می‌رسید و مرورگر
+           صفحه‌ی کاملاً سفید نشان می‌داد. حالا هر حالت پاسخ معتبر دارد. */
+        const hit = (await caches.match(req)) ||
+                    (await caches.match("/index.html")) ||
+                    (await caches.match("/"));
+        if (hit) return hit;
+        return new Response(
+          "<!doctype html><html lang=\"fa\" dir=\"rtl\"><meta charset=\"utf-8\">" +
+          "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+          "<body style=\"font-family:Tahoma,sans-serif;background:#0D1117;color:#E9EDF2;" +
+          "text-align:center;padding:60px 20px\"><h1>اتصال اینترنت برقرار نیست</h1>" +
+          "<p>لطفاً دوباره تلاش کنید.</p></body></html>",
+          { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }
+        );
+      })
     );
     return;
   }

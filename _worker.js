@@ -1,4 +1,4 @@
-/* build: v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -109,8 +109,52 @@ function kvThrottleOk(key, seconds) {
 let VISIT_PENDING = 0;
 const VISIT_FLUSH_AT = 25;
 
+/* ── v96: لایه‌ی هدرهای امنیتی ──────────────────────────────────────────────
+   هر پاسخی که از ورکر بیرون می‌رود از این تابع رد می‌شود.
+   عمداً محافظه‌کارانه است: CSP فقط چهار دستوری را می‌گذارد که هیچ اسکریپت،
+   استایل یا تصویر موجودی را نمی‌شکند، ولی جلوی iframe شدن سایت در دامنه‌ی
+   دیگر (clickjacking)، تزریق <base>، پلاگین‌ها و ارسال فرم به مقصد بیرونی
+   را می‌گیرد.
+   Referrer-Policy عمداً no-referrer است: وقتی خواننده‌ای از داخل ایران روی
+   لینک یک منبع خارجی کلیک می‌کند، آدرس این سایت نباید در لاگ مقصد بنشیند. */
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Referrer-Policy": "no-referrer",
+  "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=()",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+  "Content-Security-Policy": "frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+};
+
+function withSecurityHeaders(res) {
+  /* پاسخ‌های بدون بدنه (204/304) و ارتقای وب‌سوکت را دست نمی‌زنیم */
+  if (!res || res.status === 101 || res.status === 204 || res.status === 304) return res;
+  try {
+    const out = new Response(res.body, res);
+    for (const k in SECURITY_HEADERS) {
+      if (!out.headers.has(k)) out.headers.set(k, SECURITY_HEADERS[k]);
+    }
+    return out;
+  } catch (e) {
+    /* اگر به هر دلیلی نشد، پاسخ اصلی برمی‌گردد — سایت نباید به خاطر هدر بشکند */
+    return res;
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
+    let res;
+    try {
+      res = await route(request, env, ctx);
+    } catch (e) {
+      res = new Response("error", { status: 500 });
+    }
+    return withSecurityHeaders(res);
+  }
+};
+
+async function route(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -174,8 +218,7 @@ export default {
     if (path === "/tahlil-comments-admin/api") return handleTahlilCommentsAdminApi(request, env);
 
     return env.ASSETS.fetch(request);
-  }
-};
+}
 
 /* ---------- جام جهانی ۲۰۲۶: نتایج زنده (ESPN) ----------
    منبع: API عمومی ESPN – رایگان، بدون کلید، به‌روزرسانی لحظه‌ای
@@ -669,9 +712,14 @@ async function handleTgVid(url, request) {
     const range = request.headers.get("Range");
     if (range) fwd["Range"] = range;
     const r = await fetch(target.toString(), { headers: fwd });
-    if (!r.ok && r.status !== 206) return new Response("upstream " + r.status, { status: 502 });
+    if (!r.ok && r.status !== 206) return new Response("upstream " + r.status, { status: 400 });
+    /* v96: مثل tgimg — فقط انواع ویدئو مجازند */
+    const vct = String(r.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+    const safeVct = /^video\/(mp4|webm|ogg|quicktime)$/.test(vct) ? vct : "video/mp4";
     const headers = {
-      "Content-Type": r.headers.get("Content-Type") || "video/mp4",
+      "Content-Type": safeVct,
+      "X-Content-Type-Options": "nosniff",
+      "Content-Disposition": "inline",
       "Accept-Ranges": "bytes",
       "Cache-Control": "public, max-age=86400"
     };
@@ -699,10 +747,18 @@ async function handleTgImg(url) {
       headers: { "User-Agent": "Mozilla/5.0" },
       cf: { cacheTtl: 86400, cacheEverything: true }
     });
-    if (!r.ok) return new Response("upstream " + r.status, { status: 502 });
+    if (!r.ok) return new Response("upstream " + r.status, { status: 400 });
+    /* v96: نوع محتوا از upstream عیناً پاس داده می‌شد. اگر روزی به‌جای عکس
+       text/html برمی‌گشت، آن HTML روی دامنه‌ی خودِ ما اجرا می‌شد (XSS).
+       حالا فقط انواع تصویر مجازند و بقیه به jpeg نگاشت می‌شوند. */
+    const ct = String(r.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+    const safeCt = /^image\/(jpeg|jpg|png|gif|webp|avif|svg\+xml)$/.test(ct) && ct !== "image/svg+xml"
+      ? ct : "image/jpeg";
     return new Response(r.body, {
       headers: {
-        "Content-Type": r.headers.get("Content-Type") || "image/jpeg",
+        "Content-Type": safeCt,
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": "inline",
         "Cache-Control": "public, max-age=86400"
       }
     });
@@ -3861,7 +3917,25 @@ function tcmDate(ts, lang) {
 
 /* ---------- دریافت نظر تازه (عمومی) ---------- */
 
+/* ── v95: کلید قطع/وصل نظرها ──────────────────────────────────────────────
+   تا زمانی که Impressum و Datenschutzerklärung روی سایت منتشر نشده‌اند،
+   جمع‌آوری داده‌ی کاربر (نام دلخواه + متن نظر) پایه‌ی حقوقی ندارد.
+   با false شدن این ثابت: فرم روی صفحه نمایش داده نمی‌شود و اندپوینت هم
+   درخواست را رد می‌کند. نظرهای منتشرشده‌ی قبلی سر جایشان می‌مانند.
+   بعد از انتشار صفحات حقوقی فقط همین را true کن. */
+const TCM_ENABLED = false;
+
+const TCM_CLOSED = {
+  fa: "بخش نظرها موقتاً بسته است.",
+  en: "Comments are temporarily closed.",
+  de: "Die Kommentarfunktion ist vorübergehend geschlossen."
+};
+
 async function handleTahlilCommentPost(request, env) {
+  if (!TCM_ENABLED) {
+    return new Response(JSON.stringify({ ok: false, error: "comments_closed" }), { status: 403, headers: JSON_HEADERS });
+  }
+
   if (request.method !== "POST") {
     return new Response(JSON.stringify({ ok: false, error: "method" }), { status: 405, headers: JSON_HEADERS });
   }
@@ -3975,7 +4049,7 @@ async function tahlilEngagementHtml(env, id, lang) {
   <p class="cmpolicy">${escHtml(C.policy)}</p>
   <ul class="cmlist">${list}</ul>
 
-  <div class="cmform">
+  ${TCM_ENABLED ? `<div class="cmform">
     <b>${escHtml(C.formTitle)}</b>
     <label for="cmn">${escHtml(C.name)}</label>
     <input id="cmn" maxlength="40" placeholder="${escHtml(C.namePh)}">
@@ -3984,7 +4058,7 @@ async function tahlilEngagementHtml(env, id, lang) {
     <input class="hp" id="cmhp" tabindex="-1" autocomplete="off" aria-hidden="true">
     <button id="cmb">${escHtml(C.send)}</button>
     <div class="cmmsg" id="cmm"></div>
-  </div>
+  </div>` : `<p class="cmpolicy">${escHtml(TCM_CLOSED[l] || TCM_CLOSED.fa)}</p>`}
 </section>
 <script>
 (function(){
@@ -4021,7 +4095,7 @@ async function tahlilEngagementHtml(env, id, lang) {
   var tb=document.getElementById('cmb'), tt=document.getElementById('cmt'),
       tn=document.getElementById('cmn'), th=document.getElementById('cmhp'),
       tm=document.getElementById('cmm');
-  tb.onclick=function(){
+  if(tb) tb.onclick=function(){
     var txt=(tt.value||'').trim();
     if(txt.length<2){ tm.textContent=T.errEmpty; tm.className='cmmsg err'; return; }
     tb.disabled=true; tm.textContent=T.sending; tm.className='cmmsg';

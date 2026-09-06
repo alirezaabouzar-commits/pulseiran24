@@ -28,7 +28,9 @@
 <meta name="apple-mobile-web-app-title" content="Pulse Iran 24">
 
 <!-- ===== OneSignal Web Push (نوتیفیکیشن خبر فوری) ===== -->
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<!-- v96: SDK دیگر در <head> بارگذاری نمی‌شود. بعد از load و در زمان بیکاری
+     مرورگر تزریق می‌شود، با مهلت ۱۵ ثانیه. اگر cdn.onesignal.com مسدود باشد
+     (مثل داخل ایران) هیچ اتصال معلقی روی صفحه باقی نمی‌ماند. -->
 <script>
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(async function(OneSignal) {
@@ -39,6 +41,27 @@
       serviceWorkerUpdaterPath: "OneSignalSDKUpdaterWorker.js"
     });
   });
+
+  /* v96: بارگذاری تنبل SDK */
+  (function () {
+    var loaded = false;
+    function loadOneSignal() {
+      if (loaded) return;
+      loaded = true;
+      var sc = document.createElement("script");
+      sc.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+      sc.async = true;
+      sc.referrerPolicy = "no-referrer";
+      sc.onerror = function () { /* مسدود یا در دسترس نیست — بی‌صدا رد می‌شویم */ };
+      document.head.appendChild(sc);
+    }
+    function schedule() {
+      if (window.requestIdleCallback) requestIdleCallback(loadOneSignal, { timeout: 15000 });
+      else setTimeout(loadOneSignal, 4000);
+    }
+    if (document.readyState === "complete") schedule();
+    else window.addEventListener("load", schedule, { once: true });
+  })();
 </script>
 
 <!-- ===== Open Graph (تلگرام، واتساپ، فیسبوک) ===== -->
@@ -1089,9 +1112,9 @@
     <button class="live-tab" data-ch="france24" onclick="playChannel('france24')">France 24</button>
     <button class="live-tab" data-ch="dw" onclick="playChannel('dw')">DW</button>
     <button class="live-tab" data-ch="ard" onclick="playChannel('ard')">ARD</button>
-    <a class="live-tab live-link" href="https://www.bbc.com/persian" target="_blank" rel="noopener">BBC فارسی ↗</a>
-    <a class="live-tab live-link" href="https://edition.cnn.com/live-tv" target="_blank" rel="noopener">CNN ↗</a>
-    <a class="live-tab live-link" href="https://www.zdf.de/live-tv" target="_blank" rel="noopener">ZDF ↗</a>
+    <a class="live-tab live-link" href="https://www.bbc.com/persian" target="_blank" rel="noopener noreferrer">BBC فارسی ↗</a>
+    <a class="live-tab live-link" href="https://edition.cnn.com/live-tv" target="_blank" rel="noopener noreferrer">CNN ↗</a>
+    <a class="live-tab live-link" href="https://www.zdf.de/live-tv" target="_blank" rel="noopener noreferrer">ZDF ↗</a>
   </div>
   <div class="live-embed" id="liveEmbedWrap">
     <iframe id="liveFrame" src="about:blank" title="Live"
@@ -1101,10 +1124,10 @@
   <div class="live-fallback" id="liveFallback" style="display:none;">
     <div class="live-fallback-inner">
       <span class="live-fallback-title" id="liveFallbackTitle">پخش زنده ایران اینترنشنال</span>
-      <a class="btn btn-telegram" id="liveFallbackBtn" href="https://www.youtube.com/@IRANINTL/live" target="_blank" rel="noopener">▶ تماشای زنده در یوتیوب</a>
+      <a class="btn btn-telegram" id="liveFallbackBtn" href="https://www.youtube.com/@IRANINTL/live" target="_blank" rel="noopener noreferrer">▶ تماشای زنده در یوتیوب</a>
     </div>
   </div>
-  <a id="liveYtLink" class="live-yt-link" href="https://www.youtube.com/@IRANINTL/live" target="_blank" rel="noopener">▶ تماشا در یوتیوب</a>
+  <a id="liveYtLink" class="live-yt-link" href="https://www.youtube.com/@IRANINTL/live" target="_blank" rel="noopener noreferrer">▶ تماشا در یوتیوب</a>
 </section>
 
 <!-- بخش رویدادهای روز (تا وقتی عکس نباشد پنهان است) -->
@@ -1297,6 +1320,13 @@
     }
     #newsSources .ns-card:hover{border-color:rgba(212,175,55,.6);background:rgba(255,255,255,.07)}
     #newsSources .ns-card img{width:22px;height:22px;border-radius:5px;object-fit:contain;flex:0 0 22px}
+    /* v96: جای فاوآیکنِ گوگل. هیچ درخواست بیرونی ندارد — هم برای DSGVO لازم بود
+       هم برای ایران، چون درخواست به دامنه‌ی مسدود، بارگذاری صفحه را معلق می‌کرد. */
+    #newsSources .ns-card .ns-ico{width:22px;height:22px;border-radius:5px;flex:0 0 22px;
+      display:inline-flex;align-items:center;justify-content:center;
+      background:rgba(212,175,55,.16);border:1px solid rgba(212,175,55,.35);
+      color:#d4af37;font-size:.62rem;font-weight:800;letter-spacing:0;direction:ltr;
+      line-height:1;user-select:none}
     #newsSources .ns-card .lat{direction:ltr;font-family:inherit}
   </style>
   <div class="section-head">
@@ -1307,27 +1337,27 @@
 
   <div class="ns-group">فارسی‌زبان</div>
   <div class="ns-grid">
-    <a class="ns-card" href="https://www.bbc.com/persian" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=bbc.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span>BBC فارسی</span></a>
-    <a class="ns-card" href="https://www.iranintl.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=iranintl.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span>ایران اینترنشنال</span></a>
-    <a class="ns-card" href="https://www.radiofarda.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=radiofarda.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span>رادیو فردا</span></a>
-    <a class="ns-card" href="https://www.dw.com/fa-ir" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=dw.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span>DW فارسی</span></a>
-    <a class="ns-card" href="https://ir.voanews.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=voanews.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span>صدای آمریکا</span></a>
-    <a class="ns-card" href="https://per.euronews.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=euronews.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span>یورونیوز فارسی</span></a>
-    <a class="ns-card" href="https://www.independentpersian.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=independentpersian.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span>ایندیپندنت فارسی</span></a>
+    <a class="ns-card" href="https://www.bbc.com/persian" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">B</span><span>BBC فارسی</span></a>
+    <a class="ns-card" href="https://www.iranintl.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">ای</span><span>ایران اینترنشنال</span></a>
+    <a class="ns-card" href="https://www.radiofarda.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">RF</span><span>رادیو فردا</span></a>
+    <a class="ns-card" href="https://www.dw.com/fa-ir" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">DW</span><span>DW فارسی</span></a>
+    <a class="ns-card" href="https://ir.voanews.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">VOA</span><span>صدای آمریکا</span></a>
+    <a class="ns-card" href="https://per.euronews.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">EN</span><span>یورونیوز فارسی</span></a>
+    <a class="ns-card" href="https://www.independentpersian.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">IP</span><span>ایندیپندنت فارسی</span></a>
   </div>
 
   <div class="ns-group">بین‌المللی</div>
   <div class="ns-grid">
-    <a class="ns-card" href="https://www.reuters.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=reuters.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">Reuters</span></a>
-    <a class="ns-card" href="https://apnews.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=apnews.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">AP News</span></a>
-    <a class="ns-card" href="https://www.bbc.com/news" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=bbc.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">BBC News</span></a>
-    <a class="ns-card" href="https://www.aljazeera.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=aljazeera.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">Al Jazeera</span></a>
-    <a class="ns-card" href="https://www.cnn.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=cnn.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">CNN</span></a>
-    <a class="ns-card" href="https://www.theguardian.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=theguardian.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">The Guardian</span></a>
-    <a class="ns-card" href="https://www.dw.com/en" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=dw.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">DW</span></a>
-    <a class="ns-card" href="https://www.dpa.com" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=dpa.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">DPA</span></a>
-    <a class="ns-card" href="https://www.tagesschau.de" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=tagesschau.de&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">Tagesschau</span></a>
-    <a class="ns-card" href="https://www.france24.com/en/" target="_blank" rel="noopener"><img src="https://www.google.com/s2/favicons?domain=france24.com&sz=64" alt="" loading="lazy" onerror="this.style.display='none'"><span class="lat">France 24</span></a>
+    <a class="ns-card" href="https://www.reuters.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">R</span><span class="lat">Reuters</span></a>
+    <a class="ns-card" href="https://apnews.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">AP</span><span class="lat">AP News</span></a>
+    <a class="ns-card" href="https://www.bbc.com/news" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">B</span><span class="lat">BBC News</span></a>
+    <a class="ns-card" href="https://www.aljazeera.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">AJ</span><span class="lat">Al Jazeera</span></a>
+    <a class="ns-card" href="https://www.cnn.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">CN</span><span class="lat">CNN</span></a>
+    <a class="ns-card" href="https://www.theguardian.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">G</span><span class="lat">The Guardian</span></a>
+    <a class="ns-card" href="https://www.dw.com/en" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">DW</span><span class="lat">DW</span></a>
+    <a class="ns-card" href="https://www.dpa.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">DP</span><span class="lat">DPA</span></a>
+    <a class="ns-card" href="https://www.tagesschau.de" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">TS</span><span class="lat">Tagesschau</span></a>
+    <a class="ns-card" href="https://www.france24.com/en/" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">F24</span><span class="lat">France 24</span></a>
   </div>
 </section>
 
@@ -1336,10 +1366,10 @@
 
 <footer>
   <div class="socials">
-    <a href="https://telegram.me/pulseiran24" target="_blank" rel="noopener" id="t-f1">تلگرام</a>
-    <a href="https://instagram.com/pulseiran24" target="_blank" rel="noopener" id="t-f2">اینستاگرام</a>
-    <a href="https://youtube.com/@pulseiran24" target="_blank" rel="noopener" id="t-f3">یوتیوب</a>
-    <a href="https://tiktok.com/@pulseiran24" target="_blank" rel="noopener" id="t-f4">تیک‌تاک</a>
+    <a href="https://telegram.me/pulseiran24" target="_blank" rel="noopener noreferrer" id="t-f1">تلگرام</a>
+    <a href="https://instagram.com/pulseiran24" target="_blank" rel="noopener noreferrer" id="t-f2">اینستاگرام</a>
+    <a href="https://youtube.com/@pulseiran24" target="_blank" rel="noopener noreferrer" id="t-f3">یوتیوب</a>
+    <a href="https://tiktok.com/@pulseiran24" target="_blank" rel="noopener noreferrer" id="t-f4">تیک‌تاک</a>
   </div>
   <div class="legal-links">
     <a href="/tahlil" id="t-ftahlil">🎧 تحلیل صوتی</a>
@@ -1843,14 +1873,14 @@ function newsCardHTML(item, i) {
     ? `<button class="mini-btn like-btn" id="like-${pid}" onclick="likeItem('${pid}', this)">❤️ <span>–</span></button>`
     : "";
   const commentsHtml = pid
-    ? `<a class="mini-btn" style="text-decoration:none;" href="${esc(item.link)}" target="_blank" rel="noopener">💬 ${esc(L.comments)}</a>`
+    ? `<a class="mini-btn" style="text-decoration:none;" href="${esc(item.link)}" target="_blank" rel="noopener noreferrer">💬 ${esc(L.comments)}</a>`
     : "";
   let photoHtml = "";
   if (item.video) {
     const poster = item.vthumb ? ' poster="' + esc(item.vthumb) + '"' : "";
     photoHtml = '<video class="news-photo" controls playsinline preload="metadata"' + poster + ' src="' + esc(item.video) + '" onerror="this.remove()"></video>';
   } else if (item.vthumb) {
-    photoHtml = '<a class="news-vthumb" href="' + esc(item.link) + '" target="_blank" rel="noopener">' +
+    photoHtml = '<a class="news-vthumb" href="' + esc(item.link) + '" target="_blank" rel="noopener noreferrer">' +
       '<img class="news-photo" src="' + esc(item.vthumb) + '" alt="" loading="lazy" onerror="this.parentElement.remove()">' +
       '<span class="play-badge">▶</span>' +
       '<span class="vlabel">' + esc(L.longVideo || "ویدیوی طولانی · مشاهده در تلگرام") + '</span></a>';
@@ -1876,7 +1906,7 @@ function newsCardHTML(item, i) {
     <p>${esc(item.summary)}</p>
     <div class="card-actions">
       ${readMoreHtml}
-      <a class="news-link" href="${esc(item.link)}" target="_blank" rel="noopener">${esc(L.viewtg)}</a>
+      <a class="news-link" href="${esc(item.link)}" target="_blank" rel="noopener noreferrer">${esc(L.viewtg)}</a>
       ${likeHtml}
       ${commentsHtml}
       <button class="mini-btn sh-wa" onclick="shareTo('whatsapp',${i})">واتساپ</button>
@@ -1933,12 +1963,12 @@ function renderNews(items) {
       '<div class="rail-ecg"><svg viewBox="0 0 400 22" preserveAspectRatio="none" fill="none"><path d="M0 11h40l10-9 14 18 9-13 6 8h60l10-9 14 18 9-13 6 8h60l10-9 14 18 9-13 6 8h60" stroke="#FF2D4A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>' +
       '<div class="rail-items">' +
       railItems.map(it =>
-        '<a class="rail-item" href="' + esc(articleUrl(it)) + '" target="_blank" rel="noopener">' +
+        '<a class="rail-item" href="' + esc(articleUrl(it)) + '" target="_blank" rel="noopener noreferrer">' +
         '<span class="rail-tm">' + (it.published ? relTime(it.published, currentLang) : "") + '</span>' +
         '<span class="rail-rt">' + esc(it.title) + '</span></a>'
       ).join("") +
       '</div>' +
-      '<a class="rail-tg-cta" href="https://telegram.me/pulseiran24" target="_blank" rel="noopener">' +
+      '<a class="rail-tg-cta" href="https://telegram.me/pulseiran24" target="_blank" rel="noopener noreferrer">' +
       '📡 <b>کانال تلگرام</b>' +
       '<span class="rtg-btn">' + (L.joinShort || "عضویت") + '</span></a>';
     // بقیه‌ی اخبار در شبکه
@@ -2241,7 +2271,7 @@ async function loadIntl() {
     if (!d || !d.ok || !d.items || !d.items.length) return;
     const t = document.getElementById("intlTicker");
     t.innerHTML = d.items.map(it =>
-      `<span><b>${esc(it.s)}:</b> <a href="${esc(it.l)}" target="_blank" rel="noopener">${esc(it.t)}</a></span>`
+      `<span><b>${esc(it.s)}:</b> <a href="${esc(it.l)}" target="_blank" rel="noopener noreferrer">${esc(it.t)}</a></span>`
     ).join("");
     document.getElementById("intlBar").style.display = "flex";
     document.body.classList.add("intl-on");
@@ -2289,7 +2319,7 @@ function renderPopular() {
     .slice(0, 5);
   if (!scored.length) { sec.style.display = "none"; return; }
   list.innerHTML = scored.map((x, idx) =>
-    `<a class="hot-item" href="/news/${esc(x.id)}" target="_blank" rel="noopener">
+    `<a class="hot-item" href="/news/${esc(x.id)}" target="_blank" rel="noopener noreferrer">
        <span class="hot-rank">${currentLang === "fa" ? faNum(idx + 1) : (idx + 1)}</span>
        <span class="hot-title">${esc(x.it.title)}</span>
        <span class="hot-likes">❤️ ${currentLang === "fa" ? faNum(x.n) : x.n}</span>
