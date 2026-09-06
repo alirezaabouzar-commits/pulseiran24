@@ -1,4 +1,4 @@
-/* build: v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -16,10 +16,17 @@ const TG_URLS = [
   "https://telegram.dog/s/pulseiran24"
 ];
 
-/* برای فعال کردن فرم تماس: کلید را از web3forms.com بگیرید و
-   یا اینجا جایگزین کنید، یا در تنظیمات Cloudflare Pages یک
-   Environment variable با نام WEB3FORMS_KEY بسازید. */
-const WEB3FORMS_KEY_FALLBACK = "6ffb7d51-99c9-4ddc-ae46-6e7e942c5126";
+/* v97: Web3Forms حذف شد. API آن انتظار فراخوانی از سمت مرورگر را دارد؛
+   فراخوانی از ورکر (سمت سرور) نیاز به پلن پولی و ثبت IP ثابت دارد و
+   ورکر کلادفلر IP ثابت ندارد — یعنی آن مسیر هیچ‌وقت کار نمی‌کرد.
+   جایگزین: دو کانال موازی، تلگرام و Resend. تنظیم در
+   Cloudflare Pages → Settings → Variables and Secrets:
+     TELEGRAM_BOT_TOKEN   توکن ربات از @BotFather
+     TELEGRAM_CHAT_ID     شناسه گفت‌وگو
+     RESEND_API_KEY       کلید API از resend.com
+     CONTACT_TO           آدرس ایمیل مقصد
+     CONTACT_FROM         اختیاری، پیش‌فرض kontakt@pulseiran24.com
+   هر کانالی که تنظیم نشده باشد بی‌صدا رد می‌شود. */
 
 const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
@@ -1654,30 +1661,72 @@ async function handleContact(request, env) {
   const message = (fields.message || "").trim();
   if (!message) return new Response("empty", { status: 400 });
 
-  const key = (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK;
-  if (!key || key === "YOUR_ACCESS_KEY_HERE") {
-    /* کلید هنوز تنظیم نشده → فرم پیام خطا نشان می‌دهد */
-    return new Response("contact not configured", { status: 503 });
+  const name  = (fields.name  || "").trim().slice(0, 120) || "ناشناس";
+  const email = (fields.email || "").trim().slice(0, 160);
+  const text  = message.slice(0, 3000);
+
+  /* پیام‌ها هیچ‌جا ذخیره نمی‌شوند — فقط عبور می‌کنند.
+     تا انتشار Datenschutzerklärung این عمدی است. */
+  const stamp = new Date().toISOString().replace("T", " ").slice(0, 16);
+  const plain =
+    "📩 پیام تازه از فرم تماس\n\n" +
+    "نام: " + name + "\n" +
+    (email ? "ایمیل: " + email + "\n" : "") +
+    "زمان: " + stamp + " UTC\n\n" +
+    text;
+
+  const jobs = [];
+
+  /* کانال ۱ — تلگرام */
+  const tgToken = env && env.TELEGRAM_BOT_TOKEN;
+  const tgChat  = env && env.TELEGRAM_CHAT_ID;
+  if (tgToken && tgChat) {
+    jobs.push(
+      fetch("https://api.telegram.org/bot" + tgToken + "/sendMessage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: tgChat,
+          text: plain.slice(0, 4000),
+          disable_web_page_preview: true
+        })
+      }).then(r => r.ok)
+    );
   }
 
-  try {
-    const r = await fetch("https://api.web3forms.com/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({
-        access_key: key,
-        subject: "پیام جدید از سایت پالس ایران ۲۴",
-        from_name: "Pulse Iran 24 Website",
-        name: (fields.name || "ناشناس").slice(0, 120),
-        message: message.slice(0, 4000)
-      })
-    });
-    const d = await r.json().catch(() => ({}));
-    if (r.ok && d && d.success) return new Response("ok", { status: 200 });
-    return new Response("send failed", { status: 502 });
-  } catch (e) {
-    return new Response("send failed", { status: 502 });
+  /* کانال ۲ — Resend */
+  const rsKey = env && env.RESEND_API_KEY;
+  const rsTo  = env && env.CONTACT_TO;
+  if (rsKey && rsTo) {
+    const rsFrom = (env && env.CONTACT_FROM) || "Pulse Iran 24 <kontakt@pulseiran24.com>";
+    const payload = {
+      from: rsFrom,
+      to: [rsTo],
+      subject: "پیام تازه از سایت پالس ایران ۲۴ — " + name,
+      text: plain
+    };
+    /* اگر فرستنده ایمیل داده بود، پاسخ‌دادن مستقیم ممکن شود */
+    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) payload.reply_to = email;
+
+    jobs.push(
+      fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + rsKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      }).then(r => r.ok)
+    );
   }
+
+  if (!jobs.length) return new Response("contact not configured", { status: 503 });
+
+  /* هر دو موازی می‌روند. اگر دست‌کم یکی رساند، برای کاربر موفق است. */
+  const results = await Promise.allSettled(jobs);
+  const delivered = results.some(r => r.status === "fulfilled" && r.value === true);
+
+  return new Response(delivered ? "ok" : "send failed", { status: delivered ? 200 : 502 });
 }
 
 
