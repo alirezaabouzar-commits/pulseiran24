@@ -1,4 +1,4 @@
-/* build: v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -223,6 +223,12 @@ async function route(request, env, ctx) {
     if (path === "/api/tahlil-comment") return handleTahlilCommentPost(request, env);
     if (path === "/tahlil-comments-admin" || path === "/tahlil-comments-admin/") return handleTahlilCommentsAdminPage();
     if (path === "/tahlil-comments-admin/api") return handleTahlilCommentsAdminApi(request, env);
+
+    /* v99 — اتاق خبر هوشمند (پشت ADMIN_TOKEN) */
+    if (path === "/ai-newsroom" || path === "/ai-newsroom/") return aiPanelPage();
+    if (path === "/api/ai/feeds")  return aiHandleFeeds(request, env);
+    if (path === "/api/ai/models") return aiHandleModels(request, env);
+    if (path === "/api/ai/draft")  return aiHandleDraft(request, env);
 
     return env.ASSETS.fetch(request);
 }
@@ -4452,3 +4458,557 @@ const TCM_ADMIN_HTML = `<!DOCTYPE html>
    (نام دلخواه و متن نظر)، چه چیزی ذخیره نمی‌شود (IP و ایمیل)،
    و اینکه نظرها پیش از انتشار بررسی می‌شوند.
    ============================================================================ */
+
+/* ============================================================================
+   v99 — اتاق خبر هوشمند  (ماژول مستقل، همه توابع با پیشوند ai)
+   پنل: /ai-newsroom   |   نیاز به Secret: GEMINI_API_KEY  (رایگان)
+   صفر نوشتن در KV — فیدها در کش لبه، لیست دیده‌شده در localStorage مرورگر
+   نام مدل در کد ثابت نیست؛ فهرست زنده از گوگل خوانده و در پنل انتخاب می‌شود
+============================================================================ */
+
+/* نام مدل‌های Gemini مدام عوض می‌شود و بعضی aliasها ناپایدارند،
+   پس هیچ نامی در کد ثابت نشده — فهرست از خود گوگل خوانده می‌شود
+   و در پنل انتخاب می‌کنید. این فقط انتخابِ پیش‌فرض است. */
+const AI_GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
+const AI_MODEL_HINT = "flash";    // ردهٔ رایگان گوگل فقط Flash است
+const AI_FEED_TTL = 600;          // ثانیه — کش لبه برای فیدها
+const AI_PER_FEED = 10;           // حداکثر آیتم از هر فید
+const AI_XML_CAP = 60000;         // حداکثر کاراکتر XML که پارس می‌شود
+const AI_PAGE_CAP = 100000;       // حداکثر کاراکتر صفحه خبر برای متن کامل
+const AI_TEXT_CAP = 6000;         // حداکثر کاراکتر متنی که به مدل می‌رود
+
+const AI_FEEDS = [
+  { name: "Guardian",    url: "https://www.theguardian.com/world/iran/rss" },
+  { name: "Guardian",    url: "https://www.theguardian.com/world/middleeast/rss" },
+  { name: "Al Jazeera",  url: "https://www.aljazeera.com/xml/rss/all.xml" },
+  { name: "BBC",         url: "https://feeds.bbci.co.uk/news/world/middle_east/rss.xml" },
+  { name: "DW",          url: "https://rss.dw.com/rdf/rss-en-world" },
+  { name: "France 24",   url: "https://www.france24.com/en/middle-east/rss" },
+  { name: "Times of Israel", url: "https://www.timesofisrael.com/feed/" }
+];
+
+/* ---------------------------------------------------------------- helpers */
+
+function aiCheckAdmin(request, env) {
+  const want = env && env.ADMIN_TOKEN;
+  if (!want) return false;
+  const url = new URL(request.url);
+  const got = request.headers.get("x-admin-token") || url.searchParams.get("token") || "";
+  return got === want;
+}
+
+function aiJson(obj, status) {
+  return new Response(JSON.stringify(obj), {
+    status: status || 200,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+  });
+}
+
+function aiDecode(s) {
+  if (!s) return "";
+  return s
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
+    .replace(/&#(\d+);/g, function (m, d) { return String.fromCodePoint(parseInt(d, 10)); })
+    .replace(/&#[xX]([0-9a-fA-F]+);/g, function (m, h) { return String.fromCodePoint(parseInt(h, 16)); })
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function aiStripTags(s) {
+  if (!s) return "";
+  return s
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t\u00a0]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function aiTag(block, tag) {
+  const re = new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)<\\/" + tag + ">", "i");
+  const m = block.match(re);
+  return m ? aiDecode(m[1]).trim() : "";
+}
+
+function aiLink(block) {
+  const direct = aiTag(block, "link");
+  if (direct && /^https?:/i.test(direct)) return direct;
+  const href = block.match(/<link[^>]*href="([^"]+)"/i);
+  return href ? aiDecode(href[1]) : "";
+}
+
+function aiParseFeed(xml, sourceName) {
+  const out = [];
+  const body = xml.length > AI_XML_CAP ? xml.slice(0, AI_XML_CAP) : xml;
+  const blocks = body.split(/<item[\s>]|<entry[\s>]/i).slice(1);
+  for (let i = 0; i < blocks.length && out.length < AI_PER_FEED; i++) {
+    const b = blocks[i];
+    const title = aiStripTags(aiTag(b, "title"));
+    if (!title) continue;
+    const link = aiLink(b);
+    if (!link) continue;
+    let summary = aiStripTags(aiTag(b, "description") || aiTag(b, "summary") || aiTag(b, "content"));
+    if (summary.length > 800) summary = summary.slice(0, 800);
+    const date = aiTag(b, "pubDate") || aiTag(b, "published") || aiTag(b, "updated") || aiTag(b, "dc:date");
+    out.push({ title: title, link: link, summary: summary, date: date, source: sourceName });
+  }
+  return out;
+}
+
+async function aiFetchOne(feed) {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(function () { ctl.abort(); }, 6000);
+    const r = await fetch(feed.url, {
+      signal: ctl.signal,
+      headers: {
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "accept": "application/rss+xml, application/xml, text/xml, */*"
+      }
+    });
+    clearTimeout(t);
+    if (!r.ok) return [];
+    const xml = await r.text();
+    return aiParseFeed(xml, feed.name);
+  } catch (e) {
+    return [];
+  }
+}
+
+async function aiFetchFeeds() {
+  const cacheKey = new Request("https://pulseiran24.com/__ai-feeds-v1");
+  const cache = caches.default;
+  try {
+    const hit = await cache.match(cacheKey);
+    if (hit) return await hit.json();
+  } catch (e) { /* کش در دسترس نبود، ادامه */ }
+
+  const settled = await Promise.allSettled(AI_FEEDS.map(aiFetchOne));
+  let items = [];
+  for (let i = 0; i < settled.length; i++) {
+    if (settled[i].status === "fulfilled") items = items.concat(settled[i].value);
+  }
+
+  // حذف تکراری بر اساس لینک
+  const seen = {};
+  const uniq = [];
+  for (let i = 0; i < items.length; i++) {
+    const k = items[i].link.split("?")[0];
+    if (seen[k]) continue;
+    seen[k] = 1;
+    uniq.push(items[i]);
+  }
+  uniq.sort(function (a, b) {
+    const ta = Date.parse(a.date || "") || 0;
+    const tb = Date.parse(b.date || "") || 0;
+    return tb - ta;
+  });
+
+  const payload = { ok: true, count: uniq.length, items: uniq };
+  try {
+    await cache.put(cacheKey, new Response(JSON.stringify(payload), {
+      headers: { "content-type": "application/json", "cache-control": "public, max-age=" + AI_FEED_TTL }
+    }));
+  } catch (e) { /* کش نشد، مهم نیست */ }
+  return payload;
+}
+
+async function aiFullText(url) {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(function () { ctl.abort(); }, 7000);
+    const r = await fetch(url, {
+      signal: ctl.signal,
+      headers: {
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "accept": "text/html,application/xhtml+xml"
+      }
+    });
+    clearTimeout(t);
+    if (!r.ok) return "";
+    let html = await r.text();
+    if (html.length > AI_PAGE_CAP) html = html.slice(0, AI_PAGE_CAP);
+    const paras = html.match(/<p[^>]*>[\s\S]{40,}?<\/p>/gi) || [];
+    let text = paras.map(aiStripTags).filter(function (p) { return p.length > 40; }).join("\n\n");
+    if (!text) text = aiStripTags(html);
+    return text.slice(0, AI_TEXT_CAP);
+  } catch (e) {
+    return "";
+  }
+}
+
+/* ------------------------------------------------------------ the prompt */
+
+function aiSystemPrompt(format) {
+  const base = [
+    "تو سردبیر کمکی سایت خبری فارسی‌زبان «پالس ایران ۲۴» هستی.",
+    "کار تو ترجمه نیست؛ بازنویسی خبری یک متن خارجی برای خوانندهٔ فارسی‌زبان است.",
+    "",
+    "خط قرمزهای منابع (غیرقابل مذاکره):",
+    "- هرگز به خبرگزاری‌های داخل ایران استناد نکن و نامشان را نیاور (تسنیم، مهر، ایسنا، ایرنا، فارس، تابناک، باشگاه خبرنگاران، صداوسیما).",
+    "  اگر متن اصلی از آن‌ها نقل کرده، همان محتوا را به شکل «به گزارش [رسانهٔ بین‌المللی]، مقام‌های ایرانی اعلام کردند...» بنویس یا حذفش کن.",
+    "- مجاهدین خلق / شورای ملی مقاومت (MEK/NCRI) اصلاً وارد متن نمی‌شود؛ نه به‌عنوان منبع، نه نقل‌قول، نه اشاره.",
+    "",
+    "محدودیت فنی پنل انتشار — بسیار مهم:",
+    "- بدنه فقط متن ساده است. هیچ HTML و هیچ مارک‌داون (** یا # یا -) ننویس؛ روی سایت به شکل متن خام دیده می‌شود.",
+    "- برای تیتربندی داخلی فقط از ایموجی ✅ ❓ ❌ 📌 🔹 و برای فهرست از ▪️ استفاده کن.",
+    "- جملهٔ اول باید یک جملهٔ کامل خبری باشد؛ هرگز با تیتر یا ایموجی شروع نکن (خلاصهٔ کارت صفحهٔ اول از همین‌جا برداشته می‌شود).",
+    "- تیتر زیر ۱۱۰ کاراکتر، بدون علامت تعجب، ترجمهٔ تحت‌اللفظی تیتر اصلی نباشد.",
+    "",
+    "زبان انتساب:",
+    "- دو منبع مستقل: «رخ داد» / «اعلام شد»",
+    "- یک منبع: «به گزارش [نام رسانه]...»",
+    "- منبع رسمی طرف درگیر: «[نهاد] مدعی شد» — ننویس «تأیید شد»",
+    "- شبکه‌های اجتماعی: «ویدئویی منتشر شده که ادعا می‌شود...» — ننویس «ویدئو نشان می‌دهد»",
+    "- اگر تأیید مستقلی نیست، همین را صریح بنویس؛ این جمله را حذف نکن.",
+    "",
+    "لحن و تایپ:",
+    "- فارسی روشن و خبری، بدون ادبیات احساسی و بدون صفت ارزشی («رژیم»، «شهید»، «تروریست») مگر داخل نقل‌قول مستقیم با ذکر گوینده.",
+    "- ی و ک فارسی (نه ي و ك عربی)، اعداد فارسی در متن، گیومهٔ «» ، ویرگول فارسی ، و علامت سؤال ؟",
+    "- نیم‌فاصله رعایت شود: می‌شود، نه می شود.",
+    "- تاریخ میلادی برای رویداد بین‌المللی. مایل را به کیلومتر تبدیل کن.",
+    "- یک تا دو جمله زمینه اضافه کن که خوانندهٔ فارسی‌زبان لازم دارد ولی در متن اصلی نیست.",
+    "- انتساب‌های متن اصلی («مقامی که نخواست نامش فاش شود») را حذف نکن.",
+    "- متن فارسی معمولاً کوتاه‌تر از اصل است؛ بخش‌های مخصوص مخاطب داخلی آن رسانه را حذف کن.",
+    "",
+    "در انتهای بدنه، این خط را بیاور:",
+    "📌 منبع: [نام رسانه]، [تاریخ میلادی]"
+  ];
+
+  if (format === "tahlil") {
+    base.push("", "این مورد را به شکل مطلب تحلیلی بلند بنویس: دست‌کم ۴۵۰ کلمه، با زمینه، پیشینه و پیامدها. باز هم فقط متن ساده.");
+  } else {
+    base.push("", "طول بدنه: ۱۵۰ تا ۳۰۰ کلمه، ۳ تا ۵ پاراگراف.");
+  }
+
+  base.push(
+    "",
+    "اگر خبر با قواعد بالا اصلاً قابل انتشار نیست، به‌جای متن این را برگردان:",
+    '{"skip": true, "reason": "دلیل کوتاه"}',
+    "",
+    "خروجی را فقط و فقط به شکل JSON خام برگردان، بدون ``` و بدون هیچ توضیح اضافه:",
+    '{"title": "تیتر فارسی", "body": "متن کامل فارسی با \\n بین پاراگراف‌ها"}'
+  );
+
+  return base.join("\n");
+}
+
+/* فهرست مدل‌های در دسترسِ همین کلید — تا نام مدل در کد ثابت نباشد */
+async function aiListModels(env) {
+  if (!env || !env.GEMINI_API_KEY) {
+    return { ok: false, error: "GEMINI_API_KEY در تنظیمات Cloudflare ثبت نشده است." };
+  }
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(function () { ctl.abort(); }, 12000);
+    const r = await fetch(AI_GEMINI_BASE + "/models?pageSize=200", {
+      signal: ctl.signal,
+      headers: { "x-goog-api-key": env.GEMINI_API_KEY }
+    });
+    clearTimeout(t);
+    const data = await r.json();
+    if (!r.ok) {
+      const msg = (data && data.error && data.error.message) ? data.error.message : ("خطای " + r.status);
+      return { ok: false, error: msg };
+    }
+    const bad = /embedding|aqa|tts|image|imagen|veo|audio|live|native|learnlm|gemma/i;
+    const list = [];
+    const all = (data && data.models) || [];
+    for (let i = 0; i < all.length; i++) {
+      const m = all[i];
+      const methods = m.supportedGenerationMethods || m.supportedActions || [];
+      if (methods.indexOf("generateContent") < 0) continue;
+      const id = String(m.name || "").replace(/^models\//, "");
+      if (!id || bad.test(id)) continue;
+      list.push({ id: id, label: m.displayName || id, flash: /flash/i.test(id) });
+    }
+    /* Flash اول — چون ردهٔ رایگان فقط همین‌هاست */
+    list.sort(function (a, b) {
+      if (a.flash !== b.flash) return a.flash ? -1 : 1;
+      return a.id.localeCompare(b.id);
+    });
+    return { ok: true, models: list };
+  } catch (e) {
+    return { ok: false, error: "خواندن فهرست مدل‌ها ناموفق بود." };
+  }
+}
+
+async function aiDraft(env, item, format, model) {
+  if (!env || !env.GEMINI_API_KEY) {
+    return { ok: false, error: "GEMINI_API_KEY در تنظیمات Cloudflare ثبت نشده است." };
+  }
+  if (!model) return { ok: false, error: "مدلی انتخاب نشده است." };
+
+  let source = item.summary || "";
+  if (item.full) source = item.full;
+
+  const userMsg = [
+    "منبع: " + (item.source || "نامشخص"),
+    "تاریخ انتشار: " + (item.date || "نامشخص"),
+    "تیتر اصلی: " + (item.title || ""),
+    "",
+    "متن:",
+    source
+  ].join("\n");
+
+  /* خبر جنگ، اعدام و حمله موشکی مرتب به فیلترهای ایمنی می‌خورد.
+     BLOCK_ONLY_HIGH یعنی فقط موارد شدید رد شوند، نه هر خبر خشونت‌آمیز. */
+  const safety = [
+    "HARM_CATEGORY_HARASSMENT",
+    "HARM_CATEGORY_HATE_SPEECH",
+    "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+    "HARM_CATEGORY_DANGEROUS_CONTENT"
+  ].map(function (c) { return { category: c, threshold: "BLOCK_ONLY_HIGH" }; });
+
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(function () { ctl.abort(); }, 55000);
+    const r = await fetch(AI_GEMINI_BASE + "/models/" + encodeURIComponent(model) + ":generateContent", {
+      method: "POST",
+      signal: ctl.signal,
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: aiSystemPrompt(format) }] },
+        contents: [{ role: "user", parts: [{ text: userMsg }] }],
+        safetySettings: safety,
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: format === "tahlil" ? 4000 : 2200,
+          responseMimeType: "application/json"
+        }
+      })
+    });
+    clearTimeout(t);
+
+    const data = await r.json();
+    if (!r.ok) {
+      let msg = (data && data.error && data.error.message) ? data.error.message : ("خطای " + r.status);
+      if (r.status === 429) msg = "سهمیهٔ رایگان امروز/این دقیقه پر شده. کمی صبر کنید یا مدل سبک‌تری انتخاب کنید.";
+      if (r.status === 404) msg = "این مدل برای کلید شما در دسترس نیست. از منو مدل دیگری انتخاب کنید.";
+      return { ok: false, error: msg };
+    }
+
+    const cand = (data && data.candidates && data.candidates[0]) || null;
+    if (!cand) {
+      const blocked = data && data.promptFeedback && data.promptFeedback.blockReason;
+      return { ok: false, error: blocked ? ("متن ورودی توسط فیلتر گوگل رد شد (" + blocked + ")") : "پاسخی برنگشت." };
+    }
+    if (cand.finishReason === "SAFETY") {
+      return { ok: false, error: "فیلتر ایمنی گوگل این خبر را رد کرد. این خبر را باید دستی بنویسید." };
+    }
+
+    let text = "";
+    const parts = (cand.content && cand.content.parts) || [];
+    for (let i = 0; i < parts.length; i++) {
+      /* بخش‌های «فکر کردن» مدل متن نهایی نیستند */
+      if (parts[i] && parts[i].thought) continue;
+      if (parts[i] && typeof parts[i].text === "string") text += parts[i].text;
+    }
+    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    if (!text) {
+      if (cand.finishReason === "MAX_TOKENS") return { ok: false, error: "پاسخ ناتمام ماند (سقف طول). دوباره بزنید." };
+      return { ok: false, error: "پاسخ خالی بود." };
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      const s = text.indexOf("{");
+      const p = text.lastIndexOf("}");
+      if (s >= 0 && p > s) {
+        try { parsed = JSON.parse(text.slice(s, p + 1)); } catch (e2) { parsed = null; }
+      }
+    }
+    if (!parsed) return { ok: false, error: "پاسخ مدل قابل خواندن نبود." };
+    if (parsed.skip) return { ok: true, skip: true, reason: parsed.reason || "قابل انتشار نیست" };
+    if (!parsed.title || !parsed.body) return { ok: false, error: "پاسخ مدل ناقص بود." };
+
+    const usage = data.usageMetadata || {};
+    return {
+      ok: true,
+      title: String(parsed.title).trim(),
+      body: String(parsed.body).trim(),
+      tokens: { in: usage.promptTokenCount || 0, out: usage.candidatesTokenCount || 0 }
+    };
+  } catch (e) {
+    return { ok: false, error: "تماس با API ناموفق بود: " + (e && e.message ? e.message : "نامشخص") };
+  }
+}
+
+/* --------------------------------------------------------------- routes */
+
+async function aiHandleFeeds(request, env) {
+  if (!aiCheckAdmin(request, env)) return aiJson({ ok: false, error: "دسترسی مجاز نیست" }, 401);
+  try {
+    const data = await aiFetchFeeds();
+    return aiJson(data);
+  } catch (e) {
+    return aiJson({ ok: false, error: "خواندن فیدها ناموفق بود" }, 200);
+  }
+}
+
+async function aiHandleModels(request, env) {
+  if (!aiCheckAdmin(request, env)) return aiJson({ ok: false, error: "دسترسی مجاز نیست" }, 401);
+  const res = await aiListModels(env);
+  return aiJson(res);
+}
+
+async function aiHandleDraft(request, env) {
+  if (!aiCheckAdmin(request, env)) return aiJson({ ok: false, error: "دسترسی مجاز نیست" }, 401);
+  if (request.method !== "POST") return aiJson({ ok: false, error: "POST لازم است" }, 200);
+
+  let body = null;
+  try { body = await request.json(); } catch (e) { return aiJson({ ok: false, error: "ورودی نامعتبر" }, 200); }
+  if (!body || !body.title) return aiJson({ ok: false, error: "تیتر خبر ارسال نشده" }, 200);
+
+  const item = {
+    title: body.title,
+    link: body.link || "",
+    summary: body.summary || "",
+    date: body.date || "",
+    source: body.source || ""
+  };
+
+  if (body.useFullText && item.link) {
+    const full = await aiFullText(item.link);
+    if (full && full.length > (item.summary || "").length) item.full = full;
+  }
+
+  const res = await aiDraft(env, item, body.format === "tahlil" ? "tahlil" : "khabar", body.model || "");
+  return aiJson(res);
+}
+
+/* ----------------------------------------------------------- the panel */
+
+function aiPanelPage() {
+  const html = '<!doctype html><html lang="fa" dir="rtl"><head>'
+    + '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<meta name="robots" content="noindex,nofollow">'
+    + '<title>اتاق خبر هوشمند — پالس ایران ۲۴</title>'
+    + '<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">'
+    + '<style>'
+    + ':root{--bg:#0f1115;--card:#171a21;--line:#262b36;--txt:#e8eaed;--dim:#9aa1ad;--red:#e11d2e}'
+    + '*{box-sizing:border-box}'
+    + 'body{margin:0;background:var(--bg);color:var(--txt);font-family:Vazirmatn,Tahoma,sans-serif;padding:14px;line-height:1.9}'
+    + 'h1{font-size:18px;margin:0 0 4px}'
+    + '.sub{color:var(--dim);font-size:12px;margin-bottom:14px}'
+    + '.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}'
+    + 'input,select,button,textarea{font-family:inherit;font-size:14px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--txt);padding:9px 11px}'
+    + 'button{cursor:pointer}'
+    + 'button.p{background:var(--red);border-color:var(--red);color:#fff;font-weight:700}'
+    + 'button:disabled{opacity:.45;cursor:default}'
+    + '.item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}'
+    + '.src{display:inline-block;font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:1px 7px;margin-inline-end:6px}'
+    + '.t{font-weight:700;margin:6px 0;font-size:15px}'
+    + '.s{color:var(--dim);font-size:13px;margin-bottom:8px}'
+    + '.acts{display:flex;gap:7px;flex-wrap:wrap}'
+    + '.acts button{font-size:13px;padding:6px 10px}'
+    + 'textarea{width:100%;margin-top:8px;min-height:230px;line-height:2.1;resize:vertical}'
+    + 'input.tt{width:100%;margin-top:10px;font-weight:700}'
+    + '.note{color:var(--dim);font-size:12px;margin-top:6px}'
+    + '.err{color:#ff8a8a;font-size:13px;margin-top:6px}'
+    + '.ok{color:#6ee7a0}'
+    + '</style></head><body>'
+    + '<h1>اتاق خبر هوشمند</h1>'
+    + '<div class="sub">بازنویسی خبر رسانه‌های مجاز به فارسی، طبق خط‌مشی سایت. خروجی را بررسی و ویرایش کنید، سپس در /admin منتشر کنید.</div>'
+    + '<div class="bar">'
+    + '<input id="tok" type="password" placeholder="رمز ادمین" style="flex:1;min-width:150px">'
+    + '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim)">'
+    + '<input id="ft" type="checkbox" checked style="width:16px;height:16px;padding:0"> متن کامل خبر</label>'
+    + '<select id="fmt"><option value="khabar">خبر عادی</option><option value="tahlil">تحلیل بلند</option></select>'
+    + '<select id="mdl"><option value="">مدل: پس از ورود</option></select>'
+    + '<button class="p" id="load">دریافت خبرها</button>'
+    + '</div>'
+    + '<div id="msg" class="note"></div>'
+    + '<div id="list"></div>'
+    + '<script>'
+    + 'var TK="";'
+    + 'function $(i){return document.getElementById(i)}'
+    + 'function seen(){try{return JSON.parse(localStorage.getItem("ai_seen")||"[]")}catch(e){return []}}'
+    + 'function mark(l){var s=seen();if(s.indexOf(l)<0){s.push(l);if(s.length>400)s=s.slice(-400);localStorage.setItem("ai_seen",JSON.stringify(s))}}'
+    + 'function esc(s){var d=document.createElement("div");d.textContent=s==null?"":s;return d.innerHTML}'
+    + 'var ITEMS=[];'
+    + 'window.addEventListener("load",function(){var t=localStorage.getItem("ai_tok");if(t){$("tok").value=t}});'
+    + '$("load").addEventListener("click",function(){'
+    + 'TK=$("tok").value.trim();if(!TK){$("msg").textContent="رمز ادمین را وارد کنید.";return}'
+    + 'localStorage.setItem("ai_tok",TK);'
+    + '$("msg").textContent="در حال خواندن فیدها...";$("load").disabled=true;'
+    + 'loadModels();'
+    + 'fetch("/api/ai/feeds",{headers:{"x-admin-token":TK}}).then(function(r){return r.json()}).then(function(d){'
+    + '$("load").disabled=false;'
+    + 'if(!d.ok){$("msg").textContent=d.error||"خطا";return}'
+    + 'var s=seen();ITEMS=d.items.filter(function(x){return s.indexOf(x.link)<0});'
+    + '$("msg").textContent=ITEMS.length+" خبر تازه از "+d.count+" مورد دریافت‌شده.";'
+    + 'render()}).catch(function(){$("load").disabled=false;$("msg").textContent="اتصال ناموفق بود."})});'
+    + 'function loadModels(){'
+    + 'fetch("/api/ai/models",{headers:{"x-admin-token":TK}}).then(function(r){return r.json()}).then(function(d){'
+    + 'var s=$("mdl");'
+    + 'if(!d.ok){s.innerHTML=\'<option value="">\'+esc(d.error)+\'</option>\';return}'
+    + 'var saved=localStorage.getItem("ai_model")||"";var h="";'
+    + 'for(var i=0;i<d.models.length;i++){var m=d.models[i];'
+    + 'h+=\'<option value="\'+esc(m.id)+\'">\'+esc(m.label)+\'</option>\'}'
+    + 's.innerHTML=h;'
+    + 'if(saved){for(var j=0;j<s.options.length;j++){if(s.options[j].value===saved){s.selectedIndex=j;break}}}'
+    + 's.onchange=function(){localStorage.setItem("ai_model",s.value)};'
+    + 'if(!saved&&s.value)localStorage.setItem("ai_model",s.value);'
+    + '}).catch(function(){})}'
+    + 'function render(){'
+    + 'var h="";for(var i=0;i<ITEMS.length;i++){var it=ITEMS[i];'
+    + 'h+=\'<div class="item" id="it\'+i+\'">\';'
+    + 'h+=\'<span class="src">\'+esc(it.source)+\'</span><a href="\'+esc(it.link)+\'" target="_blank" rel="noopener noreferrer" style="color:#7aa7ff;font-size:12px">اصل خبر</a>\';'
+    + 'h+=\'<div class="t">\'+esc(it.title)+\'</div>\';'
+    + 'h+=\'<div class="s">\'+esc((it.summary||"").slice(0,220))+\'</div>\';'
+    + 'h+=\'<div class="acts"><button onclick="draft(\'+i+\')" id="b\'+i+\'">بازنویسی فارسی</button>\';'
+    + 'h+=\'<button onclick="hide(\'+i+\')">رد کردن</button></div>\';'
+    + 'h+=\'<div id="o\'+i+\'"></div></div>\'}'
+    + '$("list").innerHTML=h}'
+    + 'function hide(i){mark(ITEMS[i].link);var e=$("it"+i);if(e)e.remove()}'
+    + 'function draft(i){'
+    + 'if(!$("mdl").value){$("msg").textContent="اول یک مدل انتخاب کنید.";return}'
+    + 'var b=$("b"+i);b.disabled=true;b.textContent="در حال نوشتن...";'
+    + 'var it=ITEMS[i];'
+    + 'fetch("/api/ai/draft",{method:"POST",headers:{"content-type":"application/json","x-admin-token":TK},'
+    + 'body:JSON.stringify({title:it.title,link:it.link,summary:it.summary,date:it.date,source:it.source,'
+    + 'useFullText:$("ft").checked,format:$("fmt").value,model:$("mdl").value})})'
+    + '.then(function(r){return r.json()}).then(function(d){'
+    + 'b.disabled=false;b.textContent="بازنویسی دوباره";'
+    + 'var o=$("o"+i);'
+    + 'if(!d.ok){o.innerHTML=\'<div class="err">\'+esc(d.error)+\'</div>\';return}'
+    + 'if(d.skip){o.innerHTML=\'<div class="err">این خبر منتشر نشود: \'+esc(d.reason)+\'</div>\';return}'
+    + 'var html=\'<input class="tt" id="ti\'+i+\'" value="\'+esc(d.title)+\'">\';'
+    + 'html+=\'<div class="note">طول تیتر: \'+d.title.length+\' کاراکتر (سقف ۱۱۰)</div>\';'
+    + 'html+=\'<textarea id="bo\'+i+\'"></textarea>\';'
+    + 'html+=\'<div class="acts" style="margin-top:8px"><button onclick="cp(\\\'ti\'+i+\'\\\',this)">کپی تیتر</button>\';'
+    + 'html+=\'<button onclick="cp(\\\'bo\'+i+\'\\\',this)">کپی متن</button>\';'
+    + 'html+=\'<button onclick="window.open(\\\'/admin\\\',\\\'_blank\\\')">باز کردن پنل انتشار</button></div>\';'
+    + 'html+=\'<div class="note">مصرف: \'+d.tokens.in+\' ورودی / \'+d.tokens.out+\' خروجی</div>\';'
+    + 'o.innerHTML=html;$("bo"+i).value=d.body;'
+    + '}).catch(function(){b.disabled=false;b.textContent="بازنویسی فارسی";$("o"+i).innerHTML=\'<div class="err">اتصال ناموفق بود.</div>\'})}'
+    + 'function cp(id,btn){var el=$(id);el.select();'
+    + 'navigator.clipboard.writeText(el.value).then(function(){btn.textContent="کپی شد";btn.className="ok";'
+    + 'setTimeout(function(){btn.textContent=id.indexOf("ti")===0?"کپی تیتر":"کپی متن";btn.className=""},1500)})}'
+    + '</script></body></html>';
+
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
+/* ===================== END AI NEWSROOM MODULE ===================== */
