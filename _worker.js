@@ -4721,6 +4721,9 @@ async function aiListModels(env) {
       return { ok: false, error: msg };
     }
     const bad = /embedding|aqa|tts|image|imagen|veo|audio|live|native|learnlm|gemma/i;
+    /* مدل‌های بازنشسته هنوز در فهرست گوگل می‌مانند ولی موقع صدا زدن ۴۰۴ می‌دهند.
+       نسخه‌های ۱.x و ۲.0 دیگر کار نمی‌کنند، پس از فهرست بیرون می‌مانند. */
+    const retired = /^gemini-(1\.|1-|2\.0|2-0)/i;
     const list = [];
     const all = (data && data.models) || [];
     for (let i = 0; i < all.length; i++) {
@@ -4728,12 +4731,18 @@ async function aiListModels(env) {
       const methods = m.supportedGenerationMethods || m.supportedActions || [];
       if (methods.indexOf("generateContent") < 0) continue;
       const id = String(m.name || "").replace(/^models\//, "");
-      if (!id || bad.test(id)) continue;
-      list.push({ id: id, label: m.displayName || id, flash: /flash/i.test(id) });
+      if (!id || bad.test(id) || retired.test(id)) continue;
+      const vm = id.match(/gemini-(\d+)(?:\.(\d+))?/i);
+      const ver = vm ? (parseInt(vm[1], 10) * 100 + (vm[2] ? parseInt(vm[2], 10) : 0)) : 0;
+      /* رتبه: Flash کامل، بعد Flash-Lite، بعد بقیه.
+         Lite سریع‌تر است ولی فارسی‌اش محسوس ضعیف‌تر است. */
+      let rank = 2;
+      if (/flash/i.test(id)) rank = /lite/i.test(id) ? 1 : 0;
+      list.push({ id: id, label: (m.displayName || id) + " — " + id, rank: rank, ver: ver });
     }
-    /* Flash اول — چون ردهٔ رایگان فقط همین‌هاست */
     list.sort(function (a, b) {
-      if (a.flash !== b.flash) return a.flash ? -1 : 1;
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      if (a.ver !== b.ver) return b.ver - a.ver;
       return a.id.localeCompare(b.id);
     });
     return { ok: true, models: list };
@@ -4929,7 +4938,7 @@ function aiPanelPage() {
     + '<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim)">'
     + '<input id="ft" type="checkbox" checked style="width:16px;height:16px;padding:0"> متن کامل خبر</label>'
     + '<select id="fmt"><option value="khabar">خبر عادی</option><option value="tahlil">تحلیل بلند</option></select>'
-    + '<select id="mdl"><option value="">مدل: پس از ورود</option></select>'
+    + '<select id="mdl" style="min-width:220px;flex:1"><option value="">مدل: پس از ورود</option></select>'
     + '<button class="p" id="load">دریافت خبرها</button>'
     + '</div>'
     + '<div id="msg" class="note"></div>'
