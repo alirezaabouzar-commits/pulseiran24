@@ -4770,43 +4770,80 @@ async function aiDraft(env, item, format, model) {
     source
   ].join("\n");
 
-  /* خبر جنگ، اعدام و حمله موشکی مرتب به فیلترهای ایمنی می‌خورد.
-     BLOCK_ONLY_HIGH یعنی فقط موارد شدید رد شوند، نه هر خبر خشونت‌آمیز. */
+  /* خبر جنگ و اعدام که هیچ — یک خبر عادی دربارهٔ سرشماری آمریکا هم به فیلتر خورد.
+     برای متن خبری BLOCK_NONE درست است؛ مسئولیت تحریریه با انسان است، نه با فیلتر گوگل. */
   const safety = [
     "HARM_CATEGORY_HARASSMENT",
     "HARM_CATEGORY_HATE_SPEECH",
     "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-    "HARM_CATEGORY_DANGEROUS_CONTENT"
-  ].map(function (c) { return { category: c, threshold: "BLOCK_ONLY_HIGH" }; });
+    "HARM_CATEGORY_DANGEROUS_CONTENT",
+    "HARM_CATEGORY_CIVIC_INTEGRITY"
+  ].map(function (c) { return { category: c, threshold: "BLOCK_NONE" }; });
 
-  try {
+  function aiBody(safetyList) {
+    return JSON.stringify({
+      systemInstruction: { parts: [{ text: aiSystemPrompt(format) }] },
+      contents: [{ role: "user", parts: [{ text: userMsg }] }],
+      safetySettings: safetyList,
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: format === "tahlil" ? 4000 : 2200,
+        responseMimeType: "application/json"
+      }
+    });
+  }
+
+  async function aiSend(bodyStr) {
     const ctl = new AbortController();
     const t = setTimeout(function () { ctl.abort(); }, 55000);
-    const r = await fetch(AI_GEMINI_BASE + "/models/" + encodeURIComponent(model) + ":generateContent", {
-      method: "POST",
-      signal: ctl.signal,
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": env.GEMINI_API_KEY
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: aiSystemPrompt(format) }] },
-        contents: [{ role: "user", parts: [{ text: userMsg }] }],
-        safetySettings: safety,
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: format === "tahlil" ? 4000 : 2200,
-          responseMimeType: "application/json"
-        }
-      })
-    });
-    clearTimeout(t);
+    try {
+      const r = await fetch(AI_GEMINI_BASE + "/models/" + encodeURIComponent(model) + ":generateContent", {
+        method: "POST",
+        signal: ctl.signal,
+        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+        body: bodyStr
+      });
+      clearTimeout(t);
+      let d = null;
+      try { d = await r.json(); } catch (e) { d = null; }
+      return { status: r.status, ok: r.ok, data: d };
+    } catch (e) {
+      clearTimeout(t);
+      return { status: 0, ok: false, data: null };
+    }
+  }
 
-    const data = await r.json();
-    if (!r.ok) {
-      let msg = (data && data.error && data.error.message) ? data.error.message : ("خطای " + r.status);
-      if (r.status === 429) msg = "سهمیهٔ رایگان امروز/این دقیقه پر شده. کمی صبر کنید یا مدل سبک‌تری انتخاب کنید.";
-      if (r.status === 404) msg = "این مدل برای کلید شما در دسترس نیست. از منو مدل دیگری انتخاب کنید.";
+  function aiSleep(ms) {
+    return new Promise(function (res) { setTimeout(res, ms); });
+  }
+
+  try {
+    let res = null;
+    let body = aiBody(safety);
+    /* شلوغی مدل و سقف درخواست در دقیقه هر دو موقتی‌اند — خودمان صبر می‌کنیم
+       به‌جای اینکه خطا را جلوی کاربر بگذاریم. سه تلاش، با فاصلهٔ فزاینده. */
+    for (let attempt = 0; attempt < 3; attempt++) {
+      res = await aiSend(body);
+      if (res.ok) break;
+      const emsg = (res.data && res.data.error && res.data.error.message) ? String(res.data.error.message) : "";
+      /* اگر مدل یکی از دسته‌های ایمنی را نشناسد، بدون آن دسته دوباره می‌فرستیم */
+      if (res.status === 400 && /HARM_CATEGORY|safety/i.test(emsg)) {
+        body = aiBody(safety.filter(function (s) { return s.category !== "HARM_CATEGORY_CIVIC_INTEGRITY"; }));
+        continue;
+      }
+      const busy = res.status === 429 || res.status === 503 || res.status === 500 || res.status === 0
+        || /high demand|overload|unavailable|exhaust/i.test(emsg);
+      if (!busy) break;
+      if (attempt < 2) await aiSleep(attempt === 0 ? 4000 : 9000);
+    }
+
+    const data = res ? res.data : null;
+    if (!res || !res.ok) {
+      let msg = (data && data.error && data.error.message) ? String(data.error.message).slice(0, 160) : ("خطای " + (res ? res.status : "نامشخص"));
+      if (res && (res.status === 429 || /exhaust/i.test(msg))) msg = "سهمیهٔ رایگان این دقیقه پر شد. یک دقیقه صبر کنید، یا از منو مدل دیگری انتخاب کنید.";
+      else if (res && (res.status === 503 || /high demand|overload|unavailable/i.test(msg))) msg = "مدل شلوغ است و سه بار تلاش جواب نداد. کمی بعد دوباره بزنید یا مدل دیگری انتخاب کنید.";
+      else if (res && res.status === 404) msg = "این مدل برای کلید شما در دسترس نیست. «تست مدل‌ها» را بزنید.";
+      else if (res && res.status === 0) msg = "پاسخی از گوگل نرسید.";
       return { ok: false, error: msg };
     }
 
@@ -5054,13 +5091,15 @@ function aiPanelPage() {
     + 'function hide(i){mark(ITEMS[i].link);var e=$("it"+i);if(e)e.remove()}'
     + 'function draft(i){'
     + 'if(!$("mdl").value){$("msg").textContent="اول یک مدل انتخاب کنید.";return}'
+    + 'if(window.__aiBusy){$("msg").textContent="یک بازنویسی در حال اجراست. سهمیهٔ رایگان اجازهٔ چند درخواست همزمان نمی‌دهد.";return}'
+    + 'window.__aiBusy=true;'
     + 'var b=$("b"+i);b.disabled=true;b.textContent="در حال نوشتن...";'
     + 'var it=ITEMS[i];'
     + 'fetch("/api/ai/draft",{method:"POST",headers:{"content-type":"application/json","x-admin-token":TK},'
     + 'body:JSON.stringify({title:it.title,link:it.link,summary:it.summary,date:it.date,source:it.source,'
     + 'useFullText:$("ft").checked,format:$("fmt").value,model:$("mdl").value})})'
     + '.then(function(r){return r.json()}).then(function(d){'
-    + 'b.disabled=false;b.textContent="بازنویسی دوباره";'
+    + 'window.__aiBusy=false;b.disabled=false;b.textContent="بازنویسی دوباره";'
     + 'var o=$("o"+i);'
     + 'if(!d.ok){o.innerHTML=\'<div class="err">\'+esc(d.error)+\'</div>\';return}'
     + 'if(d.skip){o.innerHTML=\'<div class="err">این خبر منتشر نشود: \'+esc(d.reason)+\'</div>\';return}'
@@ -5072,7 +5111,7 @@ function aiPanelPage() {
     + 'html+=\'<button onclick="window.open(\\\'/admin\\\',\\\'_blank\\\')">باز کردن پنل انتشار</button></div>\';'
     + 'html+=\'<div class="note">مصرف: \'+d.tokens.in+\' ورودی / \'+d.tokens.out+\' خروجی</div>\';'
     + 'o.innerHTML=html;$("bo"+i).value=d.body;'
-    + '}).catch(function(){b.disabled=false;b.textContent="بازنویسی فارسی";$("o"+i).innerHTML=\'<div class="err">اتصال ناموفق بود.</div>\'})}'
+    + '}).catch(function(){window.__aiBusy=false;b.disabled=false;b.textContent="بازنویسی فارسی";$("o"+i).innerHTML=\'<div class="err">اتصال ناموفق بود.</div>\'})}'
     + 'function cp(id,btn){var el=$(id);el.select();'
     + 'navigator.clipboard.writeText(el.value).then(function(){btn.textContent="کپی شد";btn.className="ok";'
     + 'setTimeout(function(){btn.textContent=id.indexOf("ti")===0?"کپی تیتر":"کپی متن";btn.className=""},1500)})}'
