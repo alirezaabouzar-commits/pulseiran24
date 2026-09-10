@@ -228,6 +228,7 @@ async function route(request, env, ctx) {
     if (path === "/ai-newsroom" || path === "/ai-newsroom/") return aiPanelPage();
     if (path === "/api/ai/feeds")  return aiHandleFeeds(request, env);
     if (path === "/api/ai/models") return aiHandleModels(request, env);
+    if (path === "/api/ai/probe")  return aiHandleProbe(request, env);
     if (path === "/api/ai/draft")  return aiHandleDraft(request, env);
 
     return env.ASSETS.fetch(request);
@@ -4869,6 +4870,54 @@ async function aiHandleFeeds(request, env) {
   }
 }
 
+/* فهرست گوگل مدل‌هایی را هم نشان می‌دهد که کلید اجازهٔ صدا زدنشان را ندارد.
+   پس به‌جای حدس زدن از روی نام، هر مدل را با یک درخواست یک‌توکنی امتحان می‌کنیم. */
+async function aiProbeOne(env, id) {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(function () { ctl.abort(); }, 15000);
+    const r = await fetch(AI_GEMINI_BASE + "/models/" + encodeURIComponent(id) + ":generateContent", {
+      method: "POST",
+      signal: ctl.signal,
+      headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: "hi" }] }],
+        generationConfig: { maxOutputTokens: 1 }
+      })
+    });
+    clearTimeout(t);
+    if (r.ok) return { id: id, ok: true, note: "سالم" };
+    /* ۴۲۹ یعنی مدل هست ولی سهمیهٔ این دقیقه پر است — خرابی نیست */
+    if (r.status === 429) return { id: id, ok: true, note: "سالم (سهمیه پر بود)" };
+    let msg = "خطای " + r.status;
+    try {
+      const d = await r.json();
+      if (d && d.error && d.error.message) msg = String(d.error.message).slice(0, 120);
+    } catch (e) { /* بدنه خوانده نشد */ }
+    return { id: id, ok: false, note: msg };
+  } catch (e) {
+    return { id: id, ok: false, note: "پاسخ نداد" };
+  }
+}
+
+async function aiHandleProbe(request, env) {
+  if (!aiCheckAdmin(request, env)) return aiJson({ ok: false, error: "دسترسی مجاز نیست" }, 401);
+  const listed = await aiListModels(env);
+  if (!listed.ok) return aiJson(listed);
+  /* سقف ۸ تا، هم برای سهمیهٔ رایگان و هم برای محدودیت subrequest ورکر */
+  const top = listed.models.slice(0, 8);
+  const settled = await Promise.allSettled(top.map(function (m) { return aiProbeOne(env, m.id); }));
+  const out = [];
+  for (let i = 0; i < settled.length; i++) {
+    const res = settled[i].status === "fulfilled"
+      ? settled[i].value
+      : { id: top[i].id, ok: false, note: "پاسخ نداد" };
+    res.label = top[i].label;
+    out.push(res);
+  }
+  return aiJson({ ok: true, results: out });
+}
+
 async function aiHandleModels(request, env) {
   if (!aiCheckAdmin(request, env)) return aiJson({ ok: false, error: "دسترسی مجاز نیست" }, 401);
   const res = await aiListModels(env);
@@ -4940,6 +4989,7 @@ function aiPanelPage() {
     + '<select id="fmt"><option value="khabar">خبر عادی</option><option value="tahlil">تحلیل بلند</option></select>'
     + '<select id="mdl" style="min-width:220px;flex:1"><option value="">مدل: پس از ورود</option></select>'
     + '<button class="p" id="load">دریافت خبرها</button>'
+    + '<button id="probe">تست مدل‌ها</button>'
     + '</div>'
     + '<div id="msg" class="note"></div>'
     + '<div id="list"></div>'
@@ -4962,6 +5012,23 @@ function aiPanelPage() {
     + 'var s=seen();ITEMS=d.items.filter(function(x){return s.indexOf(x.link)<0});'
     + '$("msg").textContent=ITEMS.length+" خبر تازه از "+d.count+" مورد دریافت‌شده.";'
     + 'render()}).catch(function(){$("load").disabled=false;$("msg").textContent="اتصال ناموفق بود."})});'
+    + '$("probe").addEventListener("click",function(){'
+    + 'TK=$("tok").value.trim();if(!TK){$("msg").textContent="رمز ادمین را وارد کنید.";return}'
+    + 'localStorage.setItem("ai_tok",TK);'
+    + '$("probe").disabled=true;$("msg").textContent="در حال تست مدل‌ها... (تا یک دقیقه)";'
+    + 'fetch("/api/ai/probe",{headers:{"x-admin-token":TK}}).then(function(r){return r.json()}).then(function(d){'
+    + '$("probe").disabled=false;'
+    + 'if(!d.ok){$("msg").textContent=d.error||"خطا";return}'
+    + 'var good=[],lines="";'
+    + 'for(var i=0;i<d.results.length;i++){var x=d.results[i];'
+    + 'lines+=(x.ok?"✅ ":"❌ ")+x.id+" — "+x.note+"\\n";if(x.ok)good.push(x)}'
+    + '$("msg").style.whiteSpace="pre-line";$("msg").textContent=lines;'
+    + 'if(!good.length){return}'
+    + 'var s=$("mdl"),h="";'
+    + 'for(var j=0;j<good.length;j++){h+=\'<option value="\'+esc(good[j].id)+\'">\'+esc(good[j].label)+\'</option>\'}'
+    + 's.innerHTML=h;localStorage.setItem("ai_model",s.value);'
+    + 's.onchange=function(){localStorage.setItem("ai_model",s.value)};'
+    + '}).catch(function(){$("probe").disabled=false;$("msg").textContent="اتصال ناموفق بود."})});'
     + 'function loadModels(){'
     + 'fetch("/api/ai/models",{headers:{"x-admin-token":TK}}).then(function(r){return r.json()}).then(function(d){'
     + 'var s=$("mdl");'
