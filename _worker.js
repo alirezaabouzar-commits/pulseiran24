@@ -4661,7 +4661,7 @@ function aiSystemPrompt(format) {
     "",
     "محدودیت فنی پنل انتشار — بسیار مهم:",
     "- بدنه فقط متن ساده است. هیچ HTML و هیچ مارک‌داون (** یا # یا -) ننویس؛ روی سایت به شکل متن خام دیده می‌شود.",
-    "- برای تیتربندی داخلی فقط از این نشانه‌ها استفاده کن: ✅ ❓ ❌ 📌 🔹 و برای فهرست ▪️ . هیچ نشانهٔ دیگری (◆ ► ● ★ …) نیاور.",
+    "- برای تیتربندی داخلی فقط 🔹 و برای فهرست ▪️ . نشانهٔ 📌 فقط برای خط منبع در انتهاست و در تیتربندی داخلی نیاید. هیچ نشانهٔ دیگری (◆ ► ● ★ …) نیاور.",
     "",
     "جملهٔ اول — مهم‌ترین قاعده:",
     "باید یک جملهٔ کامل خبری باشد که می‌گوید چه اتفاقی افتاد و به گفتهٔ چه کسی.",
@@ -4800,7 +4800,7 @@ async function aiDraft(env, item, format, model) {
       safetySettings: safetyList,
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: format === "tahlil" ? 4000 : 2200,
+        maxOutputTokens: format === "tahlil" ? 12000 : 7000,
         responseMimeType: "application/json"
       }
     });
@@ -4893,7 +4893,12 @@ async function aiDraft(env, item, format, model) {
         try { parsed = JSON.parse(text.slice(s, p + 1)); } catch (e2) { parsed = null; }
       }
     }
-    if (!parsed) return { ok: false, error: "پاسخ مدل قابل خواندن نبود." };
+    if (!parsed) {
+      if (cand.finishReason === "MAX_TOKENS") {
+        return { ok: false, error: "پاسخ وسط راه قطع شد. دوباره بزنید؛ اگر تکرار شد، تیک «متن کامل خبر» را بردارید.", busy: true };
+      }
+      return { ok: false, error: "پاسخ مدل قابل خواندن نبود. دوباره بزنید.", busy: true };
+    }
     if (parsed.skip) return { ok: true, skip: true, reason: parsed.reason || "قابل انتشار نیست" };
     if (!parsed.title || !parsed.body) return { ok: false, error: "پاسخ مدل ناقص بود." };
 
