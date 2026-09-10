@@ -4661,8 +4661,14 @@ function aiSystemPrompt(format) {
     "",
     "محدودیت فنی پنل انتشار — بسیار مهم:",
     "- بدنه فقط متن ساده است. هیچ HTML و هیچ مارک‌داون (** یا # یا -) ننویس؛ روی سایت به شکل متن خام دیده می‌شود.",
-    "- برای تیتربندی داخلی فقط از ایموجی ✅ ❓ ❌ 📌 🔹 و برای فهرست از ▪️ استفاده کن.",
-    "- جملهٔ اول باید یک جملهٔ کامل خبری باشد؛ هرگز با تیتر یا ایموجی شروع نکن (خلاصهٔ کارت صفحهٔ اول از همین‌جا برداشته می‌شود).",
+    "- برای تیتربندی داخلی فقط از این نشانه‌ها استفاده کن: ✅ ❓ ❌ 📌 🔹 و برای فهرست ▪️ . هیچ نشانهٔ دیگری (◆ ► ● ★ …) نیاور.",
+    "",
+    "جملهٔ اول — مهم‌ترین قاعده:",
+    "باید یک جملهٔ کامل خبری باشد که می‌گوید چه اتفاقی افتاد و به گفتهٔ چه کسی.",
+    "خلاصهٔ کارت صفحهٔ اول از همین جمله برداشته می‌شود، پس نباید توصیفی یا زمینه‌ای باشد.",
+    "غلط: «همکاری نظامی و اقتصادی پیونگ‌یانگ با مسکو درآمدهای قابل‌توجهی به همراه داشته است.»",
+    "درست: «کره‌شمالی درآمد حاصل از همکاری نظامی با روسیه را صرف توسعه زیرساخت و برنامه‌های تسلیحاتی کرده است؛ این را گزارشی از دویچه‌وله می‌گوید.»",
+    "هرگز با تیتر، ایموجی یا جملهٔ زمینه‌ای شروع نکن.",
     "- تیتر زیر ۱۱۰ کاراکتر، بدون علامت تعجب، ترجمهٔ تحت‌اللفظی تیتر اصلی نباشد.",
     "",
     "زبان انتساب:",
@@ -4674,7 +4680,14 @@ function aiSystemPrompt(format) {
     "",
     "لحن و تایپ:",
     "- فارسی روشن و خبری، بدون ادبیات احساسی و بدون صفت ارزشی («رژیم»، «شهید»، «تروریست») مگر داخل نقل‌قول مستقیم با ذکر گوینده.",
-    "- ی و ک فارسی (نه ي و ك عربی)، اعداد فارسی در متن، گیومهٔ «» ، ویرگول فارسی ، و علامت سؤال ؟",
+    "- ی و ک فارسی (نه ي و ك عربی)، گیومهٔ «» ، ویرگول فارسی ، و علامت سؤال ؟",
+    "",
+    "اعداد — این قاعده را دقیق رعایت کن، دو حالت دارد:",
+    "- عدد در متن عادی: فارسی. مثال: «سه کشور»، «ده‌ها نفر»، «دو هفته پیش».",
+    "- آمار، ارقام، درصد، مبلغ، تعداد کشورها و تاریخ میلادی: لاتین.",
+    "  درست: «28 هزار تبعه خارجی از 136 کشور»، «7.7 میلیارد دلار»، «26.6 میلیارد دلار»، «سال 2024»، «80 کیلومتر».",
+    "  غلط: «۲۸ هزار تبعه خارجی از ۱۳۶ کشور»، «۷.۷ میلیارد دلار»، «سال ۲۰۲۴».",
+    "- خط منبع انتها هم تاریخ میلادی است، پس لاتین: «📌 منبع: الجزیره، 10 سپتامبر 2026».",
     "- نیم‌فاصله رعایت شود: می‌شود، نه می شود.",
     "- تاریخ میلادی برای رویداد بین‌المللی. مایل را به کیلومتر تبدیل کن.",
     "- یک تا دو جمله زمینه اضافه کن که خوانندهٔ فارسی‌زبان لازم دارد ولی در متن اصلی نیست.",
@@ -4840,11 +4853,12 @@ async function aiDraft(env, item, format, model) {
     const data = res ? res.data : null;
     if (!res || !res.ok) {
       let msg = (data && data.error && data.error.message) ? String(data.error.message).slice(0, 160) : ("خطای " + (res ? res.status : "نامشخص"));
-      if (res && (res.status === 429 || /exhaust/i.test(msg))) msg = "سهمیهٔ رایگان این دقیقه پر شد. یک دقیقه صبر کنید، یا از منو مدل دیگری انتخاب کنید.";
-      else if (res && (res.status === 503 || /high demand|overload|unavailable/i.test(msg))) msg = "مدل شلوغ است و سه بار تلاش جواب نداد. کمی بعد دوباره بزنید یا مدل دیگری انتخاب کنید.";
+      let busy = false;
+      if (res && (res.status === 429 || /exhaust/i.test(msg))) { msg = "سهمیهٔ رایگان این دقیقه پر شد. یک دقیقه صبر کنید، یا از منو مدل دیگری انتخاب کنید."; busy = true; }
+      else if (res && (res.status === 503 || res.status === 500 || /high demand|overload|unavailable/i.test(msg))) { msg = "مدل شلوغ است و سه بار تلاش جواب نداد. کمی بعد دوباره بزنید یا مدل دیگری انتخاب کنید."; busy = true; }
       else if (res && res.status === 404) msg = "این مدل برای کلید شما در دسترس نیست. «تست مدل‌ها» را بزنید.";
-      else if (res && res.status === 0) msg = "پاسخی از گوگل نرسید.";
-      return { ok: false, error: msg };
+      else if (res && res.status === 0) { msg = "پاسخی از گوگل نرسید."; busy = true; }
+      return { ok: false, error: msg, busy: busy };
     }
 
     const cand = (data && data.candidates && data.candidates[0]) || null;
@@ -4982,8 +4996,26 @@ async function aiHandleDraft(request, env) {
     if (full && full.length > (item.summary || "").length) item.full = full;
   }
 
-  const res = await aiDraft(env, item, body.format === "tahlil" ? "tahlil" : "khabar", body.model || "");
-  return aiJson(res);
+  const format = body.format === "tahlil" ? "tahlil" : "khabar";
+
+  /* اگر مدل انتخابی شلوغ بود یا سهمیه‌اش پر شد، به‌جای خطا سراغ مدل سالم بعدی می‌رویم.
+     ترتیب را پنل می‌فرستد: اول انتخاب کاربر، بعد بقیهٔ مدل‌هایی که در «تست مدل‌ها» سالم بودند. */
+  let chain = [];
+  if (Array.isArray(body.models)) chain = body.models.filter(function (x) { return typeof x === "string" && x; });
+  if (body.model && chain.indexOf(body.model) < 0) chain.unshift(body.model);
+  if (!chain.length) return aiJson({ ok: false, error: "مدلی انتخاب نشده است." });
+  chain = chain.slice(0, 3);
+
+  let last = null;
+  for (let i = 0; i < chain.length; i++) {
+    last = await aiDraft(env, item, format, chain[i]);
+    if (last.ok) {
+      if (i > 0) last.usedModel = chain[i];
+      return aiJson(last);
+    }
+    if (!last.busy) break;
+  }
+  return aiJson(last);
 }
 
 /* ----------------------------------------------------------- the panel */
@@ -5066,6 +5098,8 @@ function aiPanelPage() {
     + 's.innerHTML=h;localStorage.setItem("ai_model",s.value);'
     + 's.onchange=function(){localStorage.setItem("ai_model",s.value)};'
     + '}).catch(function(){$("probe").disabled=false;$("msg").textContent="اتصال ناموفق بود."})});'
+    + 'function allModels(){var s=$("mdl"),o=[];if(s.value)o.push(s.value);'
+    + 'for(var i=0;i<s.options.length;i++){var v=s.options[i].value;if(v&&o.indexOf(v)<0)o.push(v)}return o}'
     + 'function loadModels(){'
     + 'fetch("/api/ai/models",{headers:{"x-admin-token":TK}}).then(function(r){return r.json()}).then(function(d){'
     + 'var s=$("mdl");'
@@ -5097,7 +5131,7 @@ function aiPanelPage() {
     + 'var it=ITEMS[i];'
     + 'fetch("/api/ai/draft",{method:"POST",headers:{"content-type":"application/json","x-admin-token":TK},'
     + 'body:JSON.stringify({title:it.title,link:it.link,summary:it.summary,date:it.date,source:it.source,'
-    + 'useFullText:$("ft").checked,format:$("fmt").value,model:$("mdl").value})})'
+    + 'useFullText:$("ft").checked,format:$("fmt").value,model:$("mdl").value,models:allModels()})})'
     + '.then(function(r){return r.json()}).then(function(d){'
     + 'window.__aiBusy=false;b.disabled=false;b.textContent="بازنویسی دوباره";'
     + 'var o=$("o"+i);'
@@ -5109,7 +5143,7 @@ function aiPanelPage() {
     + 'html+=\'<div class="acts" style="margin-top:8px"><button onclick="cp(\\\'ti\'+i+\'\\\',this)">کپی تیتر</button>\';'
     + 'html+=\'<button onclick="cp(\\\'bo\'+i+\'\\\',this)">کپی متن</button>\';'
     + 'html+=\'<button onclick="window.open(\\\'/admin\\\',\\\'_blank\\\')">باز کردن پنل انتشار</button></div>\';'
-    + 'html+=\'<div class="note">مصرف: \'+d.tokens.in+\' ورودی / \'+d.tokens.out+\' خروجی</div>\';'
+    + 'html+=\'<div class="note">مصرف: \'+d.tokens.in+\' ورودی / \'+d.tokens.out+\' خروجی\'+(d.usedModel?\' — با مدل جایگزین: \'+esc(d.usedModel):\'\')+\'</div>\';'
     + 'o.innerHTML=html;$("bo"+i).value=d.body;'
     + '}).catch(function(){window.__aiBusy=false;b.disabled=false;b.textContent="بازنویسی فارسی";$("o"+i).innerHTML=\'<div class="err">اتصال ناموفق بود.</div>\'})}'
     + 'function cp(id,btn){var el=$(id);el.select();'
