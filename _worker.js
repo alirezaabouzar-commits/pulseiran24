@@ -5026,7 +5026,8 @@ async function aiHandleDraft(request, env) {
 /* ----------------------------------------------------------- the panel */
 
 function aiPanelPage() {
-  const html = '<!doctype html><html lang="fa" dir="rtl"><head>'
+  const html = '<!doctype html><html lang="fa" dir="rtl" translate="no" class="notranslate"><head>'
+    + '<meta name="google" content="notranslate">'
     + '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
     + '<meta name="robots" content="noindex,nofollow">'
     + '<title>اتاق خبر هوشمند — پالس ایران ۲۴</title>'
