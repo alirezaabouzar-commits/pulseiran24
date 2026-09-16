@@ -3,6 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+/* هم‌خوانی آدرس با زبان: کسی که قبلاً EN یا DE را انتخاب کرده، روی «/» پیش از نمایش صفحه به /en یا /de می‌رود.
+   فقط روی خود «/» اجرا می‌شود؛ در /en و /de زبانِ آدرس معتبر است و هیچ هدایتی انجام نمی‌شود (حلقه ممکن نیست). */
+(function(){
+  try {
+    var p = location.pathname;
+    if (p !== "/" && p !== "/index.html") return;
+    var s = localStorage.getItem("pulseLang");
+    if (s === "en" || s === "de") location.replace("/" + s + location.search + location.hash);
+  } catch (e) {}
+})();
+</script>
 <title>پالس ایران ۲۴ | Pulse Iran 24</title>
 <meta name="description" content="پالس ایران ۲۴ — کانال خبری فارسی‌زبان در تلگرام. اخبار لحظه به لحظه ایران و جهان. Pulse Iran 24 — Persian news channel on Telegram.">
 <link rel="canonical" href="https://pulseiran24.com/">
@@ -966,8 +978,17 @@
     if(n>=1) return n.toLocaleString('en-US',{maximumFractionDigits:2});
     return n.toLocaleString('en-US',{maximumFractionDigits:4});
   }
+  /* نام دارایی‌ها از ورکر فارسی می‌آید؛ برای en/de اینجا جایگزین می‌شود */
+  var MT_NAMES = {"بیت‌کوین":{en:"Bitcoin",de:"Bitcoin"}, "اتریوم":{en:"Ethereum",de:"Ethereum"}, "تتر":{en:"Tether",de:"Tether"}, "طلا (اونس)":{en:"Gold (oz)",de:"Gold (Unze)"}};
+  function nm(n){
+    var lg = (typeof currentLang !== 'undefined') ? currentLang : 'fa';
+    return (lg !== 'fa' && MT_NAMES[n] && MT_NAMES[n][lg]) || n;
+  }
+  var lastItems = null;
+  window.__pi24MtRedraw = function(){ if(lastItems) render(lastItems); };
   function render(items){
     if(!items||!items.length){ return; }
+    lastItems = items;
     var html = items.map(function(x){
       var ch = '';
       if(x.change!==null && x.change!==undefined){
@@ -976,7 +997,7 @@
         ch = '<span class="ch '+(up?'up':'down')+'">'+arrow+' '+Math.abs(x.change).toFixed(2)+'%</span>';
       }
       return '<span class="mt-item"><span class="sym">'+x.sym+'</span>'+
-             '<span>'+x.name+'</span>'+
+             '<span>'+nm(x.name)+'</span>'+
              '<span class="px">$'+fmt(x.price)+'</span>'+ch+'</span>';
     }).join('');
     // دو بار تکرار برای اسکرول یکنواخت
@@ -1026,73 +1047,75 @@
     var LG = ['wc','ucl','epl','laliga','bundesliga','seriea','ligue1'];
     var LIVE = ['1H','2H','ET','BT','P','HT','LIVE','INT'];
     var FAN = {'France':'فرانسه','Spain':'اسپانیا','Argentina':'آرژانتین','Brazil':'برزیل','England':'انگلیس','Germany':'آلمان','Portugal':'پرتغال','Netherlands':'هلند','Italy':'ایتالیا','Belgium':'بلژیک','Croatia':'کرواسی','Morocco':'مراکش','Iran':'ایران','Japan':'ژاپن','USA':'آمریکا','Mexico':'مکزیک','Uruguay':'اروگوئه','Colombia':'کلمبیا','Real Madrid':'رئال مادرید','Barcelona':'بارسلونا','Atletico Madrid':'اتلتیکو مادرید','Manchester City':'منچسترسیتی','Manchester United':'منچستریونایتد','Liverpool':'لیورپول','Arsenal':'آرسنال','Chelsea':'چلسی','Tottenham Hotspur':'تاتنهام','Bayern Munich':'بایرن مونیخ','Borussia Dortmund':'دورتموند','Bayer Leverkusen':'لورکوزن','Juventus':'یوونتوس','Inter Milan':'اینتر','AC Milan':'آث میلان','Napoli':'ناپولی','AS Roma':'آاس رم','Paris Saint-Germain':'پاری‌سن‌ژرمن','Marseille':'مارسی','Monaco':'موناکو'};
-    function fa(n){return FAN[n]||n;}
-    function fnum(s){return String(s).replace(/\d/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'[d];});}
+    function lang(){ return (typeof currentLang!=='undefined') ? currentLang : 'fa'; }
+    function fa(n){ return lang()==='fa' ? (FAN[n]||n) : n; }
+    function fnum(s){ return lang()==='fa' ? String(s).replace(/\d/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'[d];}) : String(s); }
+    var FS_TXT={
+      fa:{ht:'بین دو نیمه',pen:'ضربات پنالتی',live:'زنده',ft:'پایان بازی',loc:'fa-IR'},
+      en:{ht:'Half-time',pen:'Penalties',live:'Live',ft:'Full-time',loc:'en-GB'},
+      de:{ht:'Halbzeit',pen:'Elfmeterschießen',live:'Live',ft:'Spielende',loc:'de-DE'}
+    };
     function minLabel(fx){
+      var T=FS_TXT[lang()]||FS_TXT.fa, isFa=lang()==='fa';
       var st=fx.fixture.status.short, el=fx.fixture.status.elapsed;
-      if(st==='HT')return 'بین دو نیمه';
-      if(st==='P')return 'ضربات پنالتی';
-      if(LIVE.indexOf(st)>-1)return el?('دقیقه '+fnum(el)):'زنده';
+      if(st==='HT')return T.ht;
+      if(st==='P')return T.pen;
+      if(LIVE.indexOf(st)>-1)return el?(isFa?('دقیقه '+fnum(el)):(el+"'")):T.live;
       if(st==='NS'){
-        try{var t=new Date(fx.fixture.date);return 'ساعت '+fnum(t.toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'}));}catch(e){return '';}
+        try{var t=new Date(fx.fixture.date);var hm=t.toLocaleTimeString(T.loc,{hour:'2-digit',minute:'2-digit'});return isFa?('ساعت '+fnum(hm)):hm;}catch(e){return '';}
       }
-      if(st==='FT'||st==='AET'||st==='PEN')return 'پایان بازی';
+      if(st==='FT'||st==='AET'||st==='PEN')return T.ft;
       return '';
     }
-    Promise.all(LG.map(function(lg){
-      return fetch('/api/worldcup?day=today&league='+lg).then(function(r){return r.ok?r.json():{response:[]};}).catch(function(){return {response:[]};});
-    })).then(function(results){
-      var all=[];
-      results.forEach(function(d){(d.response||[]).forEach(function(fx){all.push(fx);});});
-      if(!all.length)return;
-      all.sort(function(a,b){
-        var la=LIVE.indexOf(a.fixture.status.short)>-1?0:(a.fixture.status.short==='NS'?1:2);
-        var lb=LIVE.indexOf(b.fixture.status.short)>-1?0:(b.fixture.status.short==='NS'?1:2);
+    function isLiveFx(fx){ return LIVE.indexOf(fx.fixture.status.short)>-1; }
+    function sortFx(list){
+      list.sort(function(a,b){
+        var la=isLiveFx(a)?0:(a.fixture.status.short==='NS'?1:2);
+        var lb=isLiveFx(b)?0:(b.fixture.status.short==='NS'?1:2);
         if(la!==lb)return la-lb;
         return new Date(a.fixture.date)-new Date(b.fixture.date);
       });
-      var anyLive=all.some(function(fx){return LIVE.indexOf(fx.fixture.status.short)>-1;});
-      var html=all.slice(0,10).map(function(fx){
-        var isLive=LIVE.indexOf(fx.fixture.status.short)>-1;
-        var gh=fx.goals.home,ga=fx.goals.away;
-        var score=(gh===null||ga===null)?'– : –':(fnum(gh)+' : '+fnum(ga));
-        return '<a class="fs-card'+(isLive?' live':'')+'" href="/jam2026.html">'
-          +'<div class="fs-teams">'
-          +'<span class="fs-team"><img src="'+(fx.teams.home.logo||'')+'" alt="" onerror="this.style.display=\'none\'"><span>'+fa(fx.teams.home.name)+'</span></span>'
-          +'<span class="fs-score">'+score+'</span>'
-          +'<span class="fs-team"><span>'+fa(fx.teams.away.name)+'</span><img src="'+(fx.teams.away.logo||'')+'" alt="" onerror="this.style.display=\'none\'"></span>'
-          +'</div><div class="fs-min'+(isLive?'':' idle')+'">'+minLabel(fx)+'</div></a>';
-      }).join('');
-      document.getElementById('fsRow').innerHTML=html;
+      return list;
+    }
+    function card(fx){
+      var isLive=isLiveFx(fx);
+      var gh=fx.goals.home,ga=fx.goals.away;
+      var score=(gh===null||ga===null)?'– : –':(fnum(gh)+' : '+fnum(ga));
+      return '<a class="fs-card'+(isLive?' live':'')+'" href="/jam2026.html">'
+        +'<div class="fs-teams">'
+        +'<span class="fs-team"><img src="'+(fx.teams.home.logo||'')+'" alt="" onerror="this.style.display=\'none\'"><span>'+fa(fx.teams.home.name)+'</span></span>'
+        +'<span class="fs-score">'+score+'</span>'
+        +'<span class="fs-team"><span>'+fa(fx.teams.away.name)+'</span><img src="'+(fx.teams.away.logo||'')+'" alt="" onerror="this.style.display=\'none\'"></span>'
+        +'</div><div class="fs-min'+(isLive?'':' idle')+'">'+minLabel(fx)+'</div></a>';
+    }
+    var lastFx=null;
+    function draw(list){ lastFx=list; document.getElementById('fsRow').innerHTML=list.slice(0,10).map(card).join(''); }
+    /* با تغییر زبان، نوار با آخرین داده دوباره ساخته می‌شود (بدون درخواست تازه) */
+    window.__pi24FsRedraw=function(){ if(lastFx) draw(lastFx); };
+    function fetchAll(){
+      return Promise.all(LG.map(function(lg){
+        return fetch('/api/worldcup?day=today&league='+lg).then(function(r){return r.ok?r.json():{response:[]};}).catch(function(){return {response:[]};});
+      })).then(function(results){
+        var all=[];
+        results.forEach(function(d){(d.response||[]).forEach(function(fx){all.push(fx);});});
+        return sortFx(all);
+      });
+    }
+    /* رفرش سبک: صفحه اصلی هر ۹۰ ثانیه فقط نوار را تازه می‌کند، تا وقتی بازی زنده هست */
+    function refreshStrip(){
+      fetchAll().then(function(a2){
+        if(!a2.length)return;
+        draw(a2);
+        if(a2.some(isLiveFx))setTimeout(refreshStrip,90000);
+      });
+    }
+    fetchAll().then(function(all){
+      if(!all.length)return;
+      draw(all);
       document.getElementById('footballStrip').style.display='';
+      var anyLive=all.some(isLiveFx);
       if(anyLive)document.getElementById('fsLiveBadge').style.display='';
-      if(anyLive)setTimeout(function(){location.hash===''||1;refreshStrip();},90000);
-      function refreshStrip(){/* رفرش سبک: صفحه اصلی هر ۹۰ ثانیه فقط نوار را تازه می‌کند */
-        Promise.all(LG.map(function(lg){
-          return fetch('/api/worldcup?day=today&league='+lg).then(function(r){return r.ok?r.json():{response:[]};}).catch(function(){return {response:[]};});
-        })).then(function(res2){
-          var a2=[];res2.forEach(function(d){(d.response||[]).forEach(function(fx){a2.push(fx);});});
-          if(!a2.length)return;
-          a2.sort(function(a,b){
-            var la=LIVE.indexOf(a.fixture.status.short)>-1?0:(a.fixture.status.short==='NS'?1:2);
-            var lb=LIVE.indexOf(b.fixture.status.short)>-1?0:(b.fixture.status.short==='NS'?1:2);
-            if(la!==lb)return la-lb;
-            return new Date(a.fixture.date)-new Date(b.fixture.date);
-          });
-          document.getElementById('fsRow').innerHTML=a2.slice(0,10).map(function(fx){
-            var isLive=LIVE.indexOf(fx.fixture.status.short)>-1;
-            var gh=fx.goals.home,ga=fx.goals.away;
-            var score=(gh===null||ga===null)?'– : –':(fnum(gh)+' : '+fnum(ga));
-            return '<a class="fs-card'+(isLive?' live':'')+'" href="/jam2026.html">'
-              +'<div class="fs-teams">'
-              +'<span class="fs-team"><img src="'+(fx.teams.home.logo||'')+'" alt="" onerror="this.style.display=\'none\'"><span>'+fa(fx.teams.home.name)+'</span></span>'
-              +'<span class="fs-score">'+score+'</span>'
-              +'<span class="fs-team"><span>'+fa(fx.teams.away.name)+'</span><img src="'+(fx.teams.away.logo||'')+'" alt="" onerror="this.style.display=\'none\'"></span>'
-              +'</div><div class="fs-min'+(isLive?'':' idle')+'">'+minLabel(fx)+'</div></a>';
-          }).join('');
-          if(a2.some(function(fx){return LIVE.indexOf(fx.fixture.status.short)>-1;}))setTimeout(refreshStrip,90000);
-        });
-      }
+      if(anyLive)setTimeout(refreshStrip,90000);
     });
   })();
   </script>
@@ -1112,7 +1135,7 @@
     <button class="live-tab" data-ch="france24" onclick="playChannel('france24')">France 24</button>
     <button class="live-tab" data-ch="dw" onclick="playChannel('dw')">DW</button>
     <button class="live-tab" data-ch="ard" onclick="playChannel('ard')">ARD</button>
-    <a class="live-tab live-link" href="https://www.bbc.com/persian" target="_blank" rel="noopener noreferrer">BBC فارسی ↗</a>
+    <a class="live-tab live-link" href="https://www.bbc.com/persian" target="_blank" rel="noopener noreferrer" data-en="BBC Persian ↗">BBC فارسی ↗</a>
     <a class="live-tab live-link" href="https://edition.cnn.com/live-tv" target="_blank" rel="noopener noreferrer">CNN ↗</a>
     <a class="live-tab live-link" href="https://www.zdf.de/live-tv" target="_blank" rel="noopener noreferrer">ZDF ↗</a>
   </div>
@@ -1334,20 +1357,20 @@
     <span class="bar"></span>
     <h2 id="t-sources">منابع خبری معتبر</h2>
   </div>
-  <p class="ns-intro">منابع مورد استناد Pulse Iran 24 — با کلیک، در پنجره جدید باز می‌شود.</p>
+  <p class="ns-intro" id="t-nsintro">منابع مورد استناد Pulse Iran 24 — با کلیک، در پنجره جدید باز می‌شود.</p>
 
-  <div class="ns-group">فارسی‌زبان</div>
+  <div class="ns-group" id="t-nsfa">فارسی‌زبان</div>
   <div class="ns-grid">
-    <a class="ns-card" href="https://www.bbc.com/persian" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">B</span><span>BBC فارسی</span></a>
-    <a class="ns-card" href="https://www.iranintl.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">ای</span><span>ایران اینترنشنال</span></a>
-    <a class="ns-card" href="https://www.radiofarda.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">RF</span><span>رادیو فردا</span></a>
-    <a class="ns-card" href="https://www.dw.com/fa-ir" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">DW</span><span>DW فارسی</span></a>
-    <a class="ns-card" href="https://ir.voanews.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">VOA</span><span>صدای آمریکا</span></a>
-    <a class="ns-card" href="https://per.euronews.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">EN</span><span>یورونیوز فارسی</span></a>
-    <a class="ns-card" href="https://www.independentpersian.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">IP</span><span>ایندیپندنت فارسی</span></a>
+    <a class="ns-card" href="https://www.bbc.com/persian" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">B</span><span data-en="BBC Persian">BBC فارسی</span></a>
+    <a class="ns-card" href="https://www.iranintl.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true" data-en="II">ای</span><span data-en="Iran International">ایران اینترنشنال</span></a>
+    <a class="ns-card" href="https://www.radiofarda.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">RF</span><span data-en="Radio Farda">رادیو فردا</span></a>
+    <a class="ns-card" href="https://www.dw.com/fa-ir" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">DW</span><span data-en="DW Persian">DW فارسی</span></a>
+    <a class="ns-card" href="https://ir.voanews.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">VOA</span><span data-en="VOA Persian">صدای آمریکا</span></a>
+    <a class="ns-card" href="https://per.euronews.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">EN</span><span data-en="Euronews Persian">یورونیوز فارسی</span></a>
+    <a class="ns-card" href="https://www.independentpersian.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">IP</span><span data-en="Independent Persian">ایندیپندنت فارسی</span></a>
   </div>
 
-  <div class="ns-group">بین‌المللی</div>
+  <div class="ns-group" id="t-nsintl">بین‌المللی</div>
   <div class="ns-grid">
     <a class="ns-card" href="https://www.reuters.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">R</span><span class="lat">Reuters</span></a>
     <a class="ns-card" href="https://apnews.com" target="_blank" rel="noopener noreferrer"><span class="ns-ico" aria-hidden="true">AP</span><span class="lat">AP News</span></a>
@@ -1459,7 +1482,20 @@ const I18N = {
     sources: "منابع خبری معتبر",
     market: "💹 بازار",
     ytwatch: "▶ تماشای زنده در یوتیوب",
-    l1: "درباره ما", l2: "خط‌مشی تحریری", l3: "تصحیح خطا"
+    l1: "درباره ما", l2: "خط‌مشی تحریری", l3: "تصحیح خطا",
+    shWa: "واتساپ", shTg: "تلگرام", tgChannel: "کانال تلگرام", ytShort: "▶ تماشا در یوتیوب",
+    nsIntro: "منابع مورد استناد Pulse Iran 24 — با کلیک، در پنجره جدید باز می‌شود.",
+    nsFa: "فارسی‌زبان", nsIntl: "بین‌المللی",
+    ctmail: "ایمیل (اختیاری — فقط اگر می‌خواهید پاسخ بگیرید)",
+    pwaInstall: "نصب اپ پالس ایران ۲۴ روی گوشی", pwaIos: "نصب اپ روی آیفون (راهنما)",
+    iosHint: 'برای نصب روی آیفون:<br>دکمه‌ی <b>اشتراک‌گذاری</b> ⬆️ در پایین مرورگر Safari را بزنید،<br>سپس <b>«Add to Home Screen»</b> را انتخاب کنید.',
+    iosOk: "باشه",
+    docTitle: "پالس ایران ۲۴ | Pulse Iran 24",
+    docDesc: "پالس ایران ۲۴ — کانال خبری فارسی‌زبان در تلگرام. اخبار لحظه به لحظه ایران و جهان. Pulse Iran 24 — Persian news channel on Telegram.",
+    themeNight: "حالت شب", themeDay: "حالت روز", themeAria: "تغییر حالت روز و شب",
+    searchAria: "جستجو", clearAria: "پاک کردن",
+    fontAria: "اندازه فونت", fontSm: "کوچک‌تر", fontMd: "اندازه عادی", fontLg: "بزرگ‌تر",
+    frRooydad: "رویدادهای روز", frJarayed: "جراید بین‌المللی"
   },
   en: {
     dir: "ltr",
@@ -1521,7 +1557,20 @@ const I18N = {
     sources: "Trusted News Sources",
     market: "💹 Markets",
     ytwatch: "▶ Watch live on YouTube",
-    l1: "About us", l2: "Editorial policy", l3: "Corrections"
+    l1: "About us", l2: "Editorial policy", l3: "Corrections",
+    shWa: "WhatsApp", shTg: "Telegram", tgChannel: "Telegram channel", ytShort: "▶ Watch on YouTube",
+    nsIntro: "Sources cited by Pulse Iran 24 — each opens in a new window.",
+    nsFa: "Persian-language", nsIntl: "International",
+    ctmail: "Email (optional — only if you want a reply)",
+    pwaInstall: "Install the Pulse Iran 24 app on your phone", pwaIos: "Install the app on iPhone (guide)",
+    iosHint: 'To install on iPhone:<br>tap the <b>Share</b> button ⬆️ at the bottom of Safari,<br>then choose <b>“Add to Home Screen”</b>.',
+    iosOk: "OK",
+    docTitle: "Pulse Iran 24 | Iran & World News",
+    docDesc: "Pulse Iran 24 — independent Persian-language news on Iran and the world, updated around the clock.",
+    themeNight: "Dark mode", themeDay: "Light mode", themeAria: "Toggle light and dark mode",
+    searchAria: "Search", clearAria: "Clear",
+    fontAria: "Font size", fontSm: "Smaller", fontMd: "Default size", fontLg: "Larger",
+    frRooydad: "Today's Events", frJarayed: "International Press"
   },
   de: {
     dir: "ltr",
@@ -1583,7 +1632,20 @@ const I18N = {
     sources: "Vertrauenswürdige Quellen",
     market: "💹 Märkte",
     ytwatch: "▶ Live auf YouTube ansehen",
-    l1: "Über uns", l2: "Redaktionsstatut", l3: "Korrekturen"
+    l1: "Über uns", l2: "Redaktionsstatut", l3: "Korrekturen",
+    shWa: "WhatsApp", shTg: "Telegram", tgChannel: "Telegram-Kanal", ytShort: "▶ Auf YouTube ansehen",
+    nsIntro: "Von Pulse Iran 24 zitierte Quellen — öffnen sich jeweils in einem neuen Fenster.",
+    nsFa: "Persischsprachig", nsIntl: "International",
+    ctmail: "E-Mail (optional — nur wenn Sie eine Antwort möchten)",
+    pwaInstall: "Pulse-Iran-24-App aufs Handy installieren", pwaIos: "App auf dem iPhone installieren (Anleitung)",
+    iosHint: 'So installieren Sie die App auf dem iPhone:<br>Tippen Sie unten in Safari auf <b>Teilen</b> ⬆️,<br>dann auf <b>„Zum Home-Bildschirm“</b>.',
+    iosOk: "OK",
+    docTitle: "Pulse Iran 24 | Nachrichten aus Iran und der Welt",
+    docDesc: "Pulse Iran 24 — unabhängige persischsprachige Nachrichten über den Iran und die Welt, rund um die Uhr aktualisiert.",
+    themeNight: "Dunkelmodus", themeDay: "Hellmodus", themeAria: "Hell- und Dunkelmodus umschalten",
+    searchAria: "Suchen", clearAria: "Leeren",
+    fontAria: "Schriftgröße", fontSm: "Kleiner", fontMd: "Standardgröße", fontLg: "Größer",
+    frRooydad: "Ereignisse des Tages", frJarayed: "Internationale Presse"
   }
 };
 
@@ -1634,6 +1696,8 @@ try {
   const saved = localStorage.getItem("pulseLang");
   if (saved && I18N[saved]) currentLang = saved;
 } catch (e) { /* بدون ذخیره‌سازی ادامه می‌دهیم */ }
+/* در /en و /de زبانِ آدرس بر انتخاب ذخیره‌شده مقدم است (ورکر این مقدار را می‌گذارد) */
+if (window.__PI24_LANG && I18N[window.__PI24_LANG]) currentLang = window.__PI24_LANG;
 
 /* ---------- ابزارها ---------- */
 const esc = s => String(s || "").replace(/[&<>"']/g, c =>
@@ -1860,7 +1924,7 @@ function clearSearch() {
 
 /* ساخت محتوای یک کارت خبر (مشترک بین خبر اصلی و شبکه) */
 function brandPlaceholder() {
-  return '<div class="noimg"><svg viewBox="0 0 400 40" preserveAspectRatio="none" fill="none"><path d="M0 20h80l12-14 16 28 10-20 8 12h100l12-14 16 28 10-20 8 12h104" stroke="#FF2D4A" stroke-width="1.6" stroke-linecap="round"/></svg><span class="noimg-brand">پالس ایران ۲۴</span></div>';
+  return '<div class="noimg"><svg viewBox="0 0 400 40" preserveAspectRatio="none" fill="none"><path d="M0 20h80l12-14 16 28 10-20 8 12h100l12-14 16 28 10-20 8 12h104" stroke="#FF2D4A" stroke-width="1.6" stroke-linecap="round"/></svg><span class="noimg-brand">' + esc(I18N[currentLang].brand) + '</span></div>';
 }
 
 function newsCardHTML(item, i) {
@@ -1894,7 +1958,7 @@ function newsCardHTML(item, i) {
   const _newLbl = currentLang === "en" ? "NEW" : (currentLang === "de" ? "NEU" : "جدید");
   const newBadge = _fresh ? ('<span class="news-new">' + _newLbl + '</span>') : "";
   const _readLbl = currentLang === "en" ? "Read more →" : (currentLang === "de" ? "Weiterlesen →" : "ادامه مطلب ←");
-  const readMoreHtml = pid ? '<a class="news-readmore" href="/news/' + pid + '">' + _readLbl + '</a>' : "";
+  const readMoreHtml = pid ? '<a class="news-readmore" href="' + newsPath(pid) + '">' + _readLbl + '</a>' : "";
   return `
     <div class="news-meta">
       ${flagHtml}
@@ -1903,15 +1967,15 @@ function newsCardHTML(item, i) {
       ${newBadge}
     </div>
     ${photoHtml}
-    <h3>${pid ? `<a href="/news/${pid}" style="color:inherit;text-decoration:none">${esc(item.title)}</a>` : esc(item.title)}</h3>
+    <h3>${pid ? `<a href="${newsPath(pid)}" style="color:inherit;text-decoration:none">${esc(item.title)}</a>` : esc(item.title)}</h3>
     <p>${esc(item.summary)}</p>
     <div class="card-actions">
       ${readMoreHtml}
       <a class="news-link" href="${esc(item.link)}" target="_blank" rel="noopener noreferrer">${esc(L.viewtg)}</a>
       ${likeHtml}
       ${commentsHtml}
-      <button class="mini-btn sh-wa" onclick="shareTo('whatsapp',${i})">واتساپ</button>
-      <button class="mini-btn sh-tg" onclick="shareTo('telegram',${i})">تلگرام</button>
+      <button class="mini-btn sh-wa" onclick="shareTo('whatsapp',${i})">${esc(L.shWa)}</button>
+      <button class="mini-btn sh-tg" onclick="shareTo('telegram',${i})">${esc(L.shTg)}</button>
       <button class="mini-btn sh-x" onclick="shareTo('x',${i})">X</button>
       <button class="mini-btn" onclick="shareItem(${i}, this)">🔗 ${esc(L.share)}</button>
       <button class="mini-btn" onclick="copyItem(${i}, this)">📋 ${esc(L.copy)}</button>
@@ -1970,7 +2034,7 @@ function renderNews(items) {
       ).join("") +
       '</div>' +
       '<a class="rail-tg-cta" href="https://telegram.me/pulseiran24" target="_blank" rel="noopener noreferrer">' +
-      '📡 <b>کانال تلگرام</b>' +
+      '📡 <b>' + esc(L.tgChannel || "کانال تلگرام") + '</b>' +
       '<span class="rtg-btn">' + (L.joinShort || "عضویت") + '</span></a>';
     // بقیه‌ی اخبار در شبکه
     shown.slice(6).forEach((item, k) => {
@@ -2006,10 +2070,15 @@ function itemText(i) {
   return t;
 }
 
+/* مسیر صفحه خبر به زبان فعلی: /news/{id} یا /en/news/{id} یا /de/news/{id} */
+function newsPath(id) {
+  return (currentLang === "fa" ? "" : "/" + currentLang) + "/news/" + id;
+}
+
 /* ---------- اشتراک‌گذاری مستقیم تک‌خبری ---------- */
 function articleUrl(it) {
   const id = postId(it);
-  return id ? ("https://pulseiran24.com/news/" + id) : (it.link || "https://pulseiran24.com");
+  return id ? ("https://pulseiran24.com" + newsPath(id)) : (it.link || "https://pulseiran24.com");
 }
 
 function shareTo(platform, i) {
@@ -2142,7 +2211,8 @@ function applyUI() {
     "t-tahlil": "tahlil", "t-ftahlil": "tahlil", "t-fpodcast": "podcast", "t-farchive": "archivelnk",
     "t-football": "football", "t-rooydad": "rooydad", "t-jarayed": "jarayedTitle",
     "t-sources": "sources", "t-market": "market",
-    "t-l1": "l1", "t-l2": "l2", "t-l3": "l3"
+    "t-l1": "l1", "t-l2": "l2", "t-l3": "l3",
+    "t-nsintro": "nsIntro", "t-nsfa": "nsFa", "t-nsintl": "nsIntl", "liveYtLink": "ytShort"
   };
   for (const id in map) {
     const el = document.getElementById(id);
@@ -2155,6 +2225,31 @@ function applyUI() {
   if (ctName) ctName.placeholder = L.ctname;
   if (ctMsg) ctMsg.placeholder = L.ctmsg;
   if (ctSend) ctSend.textContent = L.ctsend;
+  const ctMail = document.getElementById("ctMail");
+  if (ctMail) ctMail.placeholder = L.ctmail;
+  /* نام رسانه‌ها: متن فارسی در data-fa نگهداری می‌شود، برای en/de از data-en */
+  document.querySelectorAll("[data-en]").forEach(el => {
+    if (el.dataset.fa === undefined) el.dataset.fa = el.textContent;
+    el.textContent = currentLang === "fa" ? el.dataset.fa : el.dataset.en;
+  });
+  /* عنوان تب مرورگر و توضیح صفحه */
+  document.title = L.docTitle;
+  const md = document.querySelector('meta[name="description"]');
+  if (md) md.setAttribute("content", L.docDesc);
+  /* برچسب‌های دکمه‌ها و قاب‌ها */
+  const si = document.getElementById("searchInput");
+  if (si) si.setAttribute("aria-label", L.searchAria);
+  const sc = document.getElementById("searchClear");
+  if (sc) sc.setAttribute("aria-label", L.clearAria);
+  const rf = document.querySelector('iframe[src="/rooydad.html"]');
+  if (rf) rf.title = L.frRooydad;
+  const jf = document.getElementById("jarayedFrame");
+  if (jf) jf.title = L.frJarayed;
+  /* نوار بازار و نوار فوتبال با زبان جدید دوباره ساخته می‌شوند */
+  if (typeof window.__pi24MtRedraw === "function") window.__pi24MtRedraw();
+  if (typeof window.__pi24FsRedraw === "function") window.__pi24FsRedraw();
+  /* بخش‌های پایین صفحه (ممکن است هنوز ساخته نشده باشند) */
+  applyLateText();
   document.querySelectorAll(".lang-btn").forEach(b => {
     b.classList.toggle("active", b.dataset.lang === currentLang);
   });
@@ -2189,10 +2284,41 @@ function applyUI() {
   });
 }
 
+function applyLateText() {
+  const L = I18N[currentLang];
+  const tb = document.getElementById("themeToggle");
+  if (tb) {
+    const light = (document.documentElement.getAttribute("data-theme") || "light") === "light";
+    tb.title = light ? L.themeNight : L.themeDay;
+    tb.setAttribute("aria-label", L.themeAria);
+  }
+  const fc = document.getElementById("fontCtrl");
+  if (fc) {
+    fc.setAttribute("aria-label", L.fontAria);
+    const b1 = fc.querySelector(".fs-sm"), b2 = fc.querySelector(".fs-md"), b3 = fc.querySelector(".fs-lg");
+    if (b1) b1.setAttribute("aria-label", L.fontSm);
+    if (b2) b2.setAttribute("aria-label", L.fontMd);
+    if (b3) b3.setAttribute("aria-label", L.fontLg);
+  }
+  const pt = document.getElementById("pwaText");
+  if (pt) pt.textContent = (pt.dataset.ios === "1") ? L.pwaIos : L.pwaInstall;
+  const ih = document.getElementById("iosHintText");
+  if (ih) ih.innerHTML = L.iosHint;
+  const ok = document.getElementById("iosClose");
+  if (ok) ok.textContent = L.iosOk;
+}
+
 function setLang(lang) {
   if (!I18N[lang] || lang === currentLang) return;
-  currentLang = lang;
   try { localStorage.setItem("pulseLang", lang); } catch (e) { /* بدون ذخیره */ }
+  /* دکمه زبان به آدرس همان زبان می‌رود: فا → /  ·  EN → /en  ·  DE → /de */
+  const target = lang === "fa" ? "/" : "/" + lang;
+  const norm = p => p.replace(/\/index\.html$/, "/").replace(/\/+$/, "");
+  if (norm(location.pathname) !== norm(target)) {
+    location.href = target + location.search + location.hash;
+    return;
+  }
+  currentLang = lang;
   applyUI();
   displayCurrent();
 }
@@ -2320,7 +2446,7 @@ function renderPopular() {
     .slice(0, 5);
   if (!scored.length) { sec.style.display = "none"; return; }
   list.innerHTML = scored.map((x, idx) =>
-    `<a class="hot-item" href="/news/${esc(x.id)}" target="_blank" rel="noopener noreferrer">
+    `<a class="hot-item" href="${newsPath(esc(x.id))}" target="_blank" rel="noopener noreferrer">
        <span class="hot-rank">${currentLang === "fa" ? faNum(idx + 1) : (idx + 1)}</span>
        <span class="hot-title">${esc(x.it.title)}</span>
        <span class="hot-likes">❤️ ${currentLang === "fa" ? faNum(x.n) : x.n}</span>
@@ -2513,15 +2639,15 @@ setInterval(() => {
 
 <div id="pwaInstall">
   <span class="ic">📲</span>
-  <span>نصب اپ پالس ایران ۲۴ روی گوشی</span>
+  <span id="pwaText">نصب اپ پالس ایران ۲۴ روی گوشی</span>
   <span class="cls" id="pwaClose">✕</span>
 </div>
 
 <div id="iosHint">
   <div class="box">
-    برای نصب روی آیفون:<br>
+    <span id="iosHintText">برای نصب روی آیفون:<br>
     دکمه‌ی <b>اشتراک‌گذاری</b> ⬆️ در پایین مرورگر Safari را بزنید،<br>
-    سپس <b>«Add to Home Screen»</b> را انتخاب کنید.
+    سپس <b>«Add to Home Screen»</b> را انتخاب کنید.</span>
     <br><button id="iosClose">باشه</button>
   </div>
 </div>
@@ -2574,7 +2700,9 @@ setInterval(() => {
   // آیفون: چون رویداد نصب ندارد، راهنما نشان بده
   if (isIOS() && !isStandalone() && !localStorage.getItem('iosHintSeen')) {
     setTimeout(function(){
-      installBar.querySelector('span:nth-child(2)').textContent = 'نصب اپ روی آیفون (راهنما)';
+      var pt = document.getElementById('pwaText');
+      pt.dataset.ios = '1';
+      applyLateText();
       installBar.style.display = 'flex';
       installBar.onclick = function(ev){
         if (ev.target.id === 'pwaClose') return;
@@ -2643,8 +2771,9 @@ setInterval(() => {
   function cur(){ return document.documentElement.getAttribute('data-theme') || 'light'; }
   function paintBtn(){
     if(!btn) return;
-    if(cur() === 'light'){ btn.textContent = '🌙'; btn.title = 'حالت شب'; }
-    else { btn.textContent = '☀️'; btn.title = 'حالت روز'; }
+    var L = (typeof I18N !== 'undefined' && typeof currentLang !== 'undefined') ? I18N[currentLang] : null;
+    if(cur() === 'light'){ btn.textContent = '🌙'; btn.title = L ? L.themeNight : 'حالت شب'; }
+    else { btn.textContent = '☀️'; btn.title = L ? L.themeDay : 'حالت روز'; }
   }
   function broadcast(){
     var t = cur();
@@ -2670,6 +2799,7 @@ setInterval(() => {
     if(e.data === 'rooydad-ready' || e.data === 'jarayed-ready') broadcast();
   });
   window.addEventListener('load', function(){ setTimeout(broadcast, 400); });
+  if (typeof applyLateText === 'function') applyLateText();
 })();
 
 /* ===== ظاهرشدن تدریجی بخش‌ها هنگام اسکرول ===== */

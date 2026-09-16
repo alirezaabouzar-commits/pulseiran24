@@ -1,4 +1,4 @@
-/* build: v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -998,7 +998,7 @@ function ssrCardsHtml(posts, lang, tr) {
       title = tr[title] || title;
       summary = tr[summary] || summary;
     }
-    const href = id ? "/news/" + id : (p.link || "#");
+    const href = id ? (lang === "fa" ? "" : "/" + lang) + "/news/" + id : (p.link || "#");
     const dateAttr = p.published ? escHtml(p.published) : "";
     let shown = "";
     if (p.published) {
@@ -1078,6 +1078,17 @@ async function handleHome(request, env, ctx, lang) {
         '<meta property="og:locale" content="fa_IR">',
         '<meta property="og:locale" content="' + (lang === "de" ? "de_DE" : "en_US") + '">'
       );
+      /* v100: عنوان و توضیح صفحه برای /en و /de (همان متن‌های I18N در index.html) */
+      const HOME_META = {
+        en: { t: "Pulse Iran 24 | Iran & World News", d: "Pulse Iran 24 — independent Persian-language news on Iran and the world, updated around the clock." },
+        de: { t: "Pulse Iran 24 | Nachrichten aus Iran und der Welt", d: "Pulse Iran 24 — unabhängige persischsprachige Nachrichten über den Iran und die Welt, rund um die Uhr aktualisiert." }
+      }[lang];
+      if (HOME_META) {
+        html = html.replace(/<title>[^<]*<\/title>/, "<title>" + escHtml(HOME_META.t) + "</title>");
+        html = html.replace(/<meta name="description" content="[^"]*">/, '<meta name="description" content="' + escHtml(HOME_META.d) + '">');
+        html = html.replace(/<meta property="og:title" content="[^"]*">/, '<meta property="og:title" content="' + escHtml(HOME_META.t) + '">');
+        html = html.replace(/<meta property="og:description" content="[^"]*">/, '<meta property="og:description" content="' + escHtml(HOME_META.d) + '">');
+      }
       html = html.replace("</head>", '<script>window.__PI24_LANG="' + lang + '";</script>\n</head>');
     }
 

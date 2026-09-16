@@ -88,10 +88,20 @@
 })();
 var JL = 'fa';
 var JI18N = {
-  fa: { dir:'rtl', covers:'🗞️ صفحه اول', news:'📰 تیترها', dir_tab:'🔗 روزنامه‌ها', pick:'برای نمایش، یکی از گزینه‌های بالا را انتخاب کنید 👆', closehint:'برای بستن، دوباره روی همان گزینه بزنید ✕', note:'با کلیک روی هر مورد، سایت رسمی روزنامه در تب جدید باز می‌شود.', loadingCovers:'در حال دریافت صفحه اول روزنامه‌ها…', loadingNews:'در حال دریافت تیترها…', more:'نمایش روزنامه‌های بیشتر' },
-  en: { dir:'ltr', covers:'🗞️ Front Pages', news:'📰 Headlines', dir_tab:'🔗 Newspapers', pick:'Pick one of the options above to view 👆', closehint:'Click the same option again to close ✕', note:'Clicking any item opens the newspaper\u2019s official site in a new tab.', loadingCovers:'Loading front pages…', loadingNews:'Loading headlines…', more:'Show more newspapers' },
-  de: { dir:'ltr', covers:'🗞️ Titelseiten', news:'📰 Schlagzeilen', dir_tab:'🔗 Zeitungen', pick:'Wählen Sie oben eine Option aus 👆', closehint:'Zum Schließen erneut auf dieselbe Option klicken ✕', note:'Ein Klick öffnet die offizielle Website der Zeitung in einem neuen Tab.', loadingCovers:'Titelseiten werden geladen…', loadingNews:'Schlagzeilen werden geladen…', more:'Weitere Zeitungen anzeigen' }
+  fa: { dir:'rtl', covers:'🗞️ صفحه اول', news:'📰 تیترها', dir_tab:'🔗 روزنامه‌ها', pick:'برای نمایش، یکی از گزینه‌های بالا را انتخاب کنید 👆', closehint:'برای بستن، دوباره روی همان گزینه بزنید ✕', note:'با کلیک روی هر مورد، سایت رسمی روزنامه در تب جدید باز می‌شود.', loadingCovers:'در حال دریافت صفحه اول روزنامه‌ها…', loadingNews:'در حال دریافت تیترها…', more:'نمایش روزنامه‌های بیشتر', unavail:'فعلاً در دسترس نیست، بعداً دوباره امتحان کنید.', neterr:'خطا در دریافت. اتصال را بررسی کنید.' },
+  en: { dir:'ltr', covers:'🗞️ Front Pages', news:'📰 Headlines', dir_tab:'🔗 Newspapers', pick:'Pick one of the options above to view 👆', closehint:'Click the same option again to close ✕', note:'Clicking any item opens the newspaper\u2019s official site in a new tab.', loadingCovers:'Loading front pages…', loadingNews:'Loading headlines…', more:'Show more newspapers', unavail:'Not available right now — please try again later.', neterr:'Loading failed. Please check your connection.' },
+  de: { dir:'ltr', covers:'🗞️ Titelseiten', news:'📰 Schlagzeilen', dir_tab:'🔗 Zeitungen', pick:'Wählen Sie oben eine Option aus 👆', closehint:'Zum Schließen erneut auf dieselbe Option klicken ✕', note:'Ein Klick öffnet die offizielle Website der Zeitung in einem neuen Tab.', loadingCovers:'Titelseiten werden geladen…', loadingNews:'Schlagzeilen werden geladen…', more:'Weitere Zeitungen anzeigen', unavail:'Derzeit nicht verfügbar — bitte später erneut versuchen.', neterr:'Laden fehlgeschlagen. Bitte Verbindung prüfen.' }
 };
+/* نام کشورها از ورکر و فهرست روزنامه‌ها فارسی است؛ برای en/de اینجا جایگزین می‌شود */
+var JCOUNTRY = {
+  'آمریکا':{en:'USA',de:'USA'}, 'بریتانیا':{en:'UK',de:'Großbritannien'}, 'فرانسه':{en:'France',de:'Frankreich'},
+  'آلمان':{en:'Germany',de:'Deutschland'}, 'اسپانیا':{en:'Spain',de:'Spanien'}, 'ایتالیا':{en:'Italy',de:'Italien'},
+  'اسرائیل':{en:'Israel',de:'Israel'}, 'ترکیه':{en:'Turkey',de:'Türkei'}, 'قطر':{en:'Qatar',de:'Katar'},
+  'بین‌المللی':{en:'International',de:'International'}
+};
+function jCountry(c){ return (JL !== 'fa' && JCOUNTRY[c] && JCOUNTRY[c][JL]) || c; }
+/* پیام وضعیت با کلیدش ذخیره می‌شود تا با تغییر زبان درست عوض شود */
+function jState(id, key){ var s = document.getElementById(id); if(!s) return; s.dataset.msg = key; s.textContent = (JI18N[JL]||JI18N.fa)[key]; }
 function applyJLang(lang){
   if(!JI18N[lang]) lang = 'fa';
   JL = lang;
@@ -105,8 +115,9 @@ function applyJLang(lang){
   var pk = document.getElementById('pick'); if(pk) pk.textContent = L.pick;
   var ch = document.getElementById('closehint'); if(ch) ch.textContent = L.closehint;
   var nt = document.querySelector('.note'); if(nt) nt.textContent = L.note;
-  var cs = document.getElementById('covers-state'); if(cs && cs.style.display !== 'none') cs.textContent = L.loadingCovers;
-  var ns = document.getElementById('news-state'); if(ns && ns.style.display !== 'none') ns.textContent = L.loadingNews;
+  var cs = document.getElementById('covers-state'); if(cs && cs.style.display !== 'none') cs.textContent = L[cs.dataset.msg || 'loadingCovers'];
+  var ns = document.getElementById('news-state'); if(ns && ns.style.display !== 'none') ns.textContent = L[ns.dataset.msg || 'loadingNews'];
+  document.querySelectorAll('[data-c]').forEach(function(x){ x.textContent = jCountry(x.dataset.c); });
   var mb = document.querySelector('.more-btn'); if(mb){ var m = mb.textContent.match(/\((\d+)\)/); mb.textContent = L.more + (m ? ' (' + m[1] + ')' : ''); }
 }
 </script>
@@ -166,7 +177,7 @@ function renderCover(box, c){
   const a = document.createElement('a');
   a.className='cover'; a.href=c.link; a.target='_blank'; a.rel='noopener';
   a.innerHTML =
-    '<div class="imgbox"><span class="flag">'+esc(c.country)+'</span>'+
+    '<div class="imgbox"><span class="flag" data-c="'+esc(c.country)+'">'+esc(jCountry(c.country))+'</span>'+
     '<img loading="lazy" src="'+esc(c.img)+'" alt="'+esc(c.name)+'" '+
     'onerror="this.closest(&quot;.cover&quot;).style.display=&quot;none&quot;"></div>'+
     '<div class="meta"><div class="nm">'+esc(c.name)+'</div></div>';
@@ -174,7 +185,7 @@ function renderCover(box, c){
 }
 function loadCovers(){
   fetch('/api/press-covers').then(r=>r.json()).then(function(j){
-    if(!j.ok || !j.covers || !j.covers.length){ el('covers-state').textContent='فعلاً در دسترس نیست، بعداً دوباره امتحان کنید.'; return; }
+    if(!j.ok || !j.covers || !j.covers.length){ jState('covers-state','unavail'); return; }
     el('covers-state').style.display='none';
     const box = el('covers'); box.innerHTML='';
     const moreBox = el('covers-more'); moreBox.innerHTML='';
@@ -192,13 +203,13 @@ function loadCovers(){
       wrap.appendChild(btn); moreBox.appendChild(wrap);
     }
     setTimeout(postHeight, 80);
-  }).catch(function(){ el('covers-state').textContent='خطا در دریافت. اتصال را بررسی کنید.'; });
+  }).catch(function(){ jState('covers-state','neterr'); });
 }
 
 /* تیترها */
 function loadNews(){
   fetch('/api/press-news').then(r=>r.json()).then(function(j){
-    if(!j.ok || !j.items || !j.items.length){ el('news-state').textContent='فعلاً در دسترس نیست، بعداً دوباره امتحان کنید.'; return; }
+    if(!j.ok || !j.items || !j.items.length){ jState('news-state','unavail'); return; }
     el('news-state').style.display='none';
     const groups = {};
     j.items.forEach(function(it){ (groups[it.s]=groups[it.s]||[]).push(it); });
@@ -211,7 +222,7 @@ function loadNews(){
       });
       g.innerHTML = html; box.appendChild(g);
     });
-  }).catch(function(){ el('news-state').textContent='خطا در دریافت. اتصال را بررسی کنید.'; });
+  }).catch(function(){ jState('news-state','neterr'); });
 }
 
 /* دایرکتوری */
@@ -220,7 +231,7 @@ function loadNews(){
   DIRECTORY.forEach(function(d){
     const a = document.createElement('a');
     a.href=d.u; a.target='_blank'; a.rel='noopener';
-    a.innerHTML = '<span class="ic">'+esc(d.n.charAt(0))+'</span><span class="tx"><b>'+esc(d.n)+'</b><span>'+esc(d.c)+'</span></span>';
+    a.innerHTML = '<span class="ic">'+esc(d.n.charAt(0))+'</span><span class="tx"><b>'+esc(d.n)+'</b><span data-c="'+esc(d.c)+'">'+esc(jCountry(d.c))+'</span></span>';
     box.appendChild(a);
   });
 })();
