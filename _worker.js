@@ -1,4 +1,4 @@
-/* build: v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -727,7 +727,7 @@ async function handleTgVid(url, request) {
     const range = request.headers.get("Range");
     if (range) fwd["Range"] = range;
     const r = await fetch(target.toString(), { headers: fwd });
-    if (!r.ok && r.status !== 206) return new Response("upstream " + r.status, { status: 400 });
+    if (!r.ok && r.status !== 206) return tgMediaGone();
     /* v96: مثل tgimg — فقط انواع ویدئو مجازند */
     const vct = String(r.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
     const safeVct = /^video\/(mp4|webm|ogg|quicktime)$/.test(vct) ? vct : "video/mp4";
@@ -748,6 +748,17 @@ async function handleTgVid(url, request) {
   }
 }
 
+/* v101: لینک فایل‌های CDN تلگرام بعد از مدتی منقضی می‌شود. قبلاً پاسخ 400 بود و
+   Search Console آن‌ها را «Blocked due to other 4xx issue» گزارش می‌کرد (121 آدرس).
+   404 برای گوگل وضعیت عادیِ «فایل دیگر نیست» است؛ noindex هم جلوی ثبت خطا را می‌گیرد.
+   5xx عمداً استفاده نمی‌شود: گوگل با خطای سرور سرعت خزیدن کل سایت را کم می‌کند. */
+function tgMediaGone() {
+  return new Response("gone", {
+    status: 404,
+    headers: { "X-Robots-Tag": "noindex", "Cache-Control": "public, max-age=3600" }
+  });
+}
+
 /* پروکسی امن عکس‌های تلگرام — فقط دامنه‌های CDN تلگرام مجازند */
 async function handleTgImg(url) {
   const u = url.searchParams.get("u") || "";
@@ -762,7 +773,7 @@ async function handleTgImg(url) {
       headers: { "User-Agent": "Mozilla/5.0" },
       cf: { cacheTtl: 86400, cacheEverything: true }
     });
-    if (!r.ok) return new Response("upstream " + r.status, { status: 400 });
+    if (!r.ok) return tgMediaGone();
     /* v96: نوع محتوا از upstream عیناً پاس داده می‌شد. اگر روزی به‌جای عکس
        text/html برمی‌گشت، آن HTML روی دامنه‌ی خودِ ما اجرا می‌شد (XSS).
        حالا فقط انواع تصویر مجازند و بقیه به jpeg نگاشت می‌شوند. */
