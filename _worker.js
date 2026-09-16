@@ -1,4 +1,4 @@
-/* build: v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -188,6 +188,7 @@ async function route(request, env, ctx) {
     if (path === "/.netlify/functions/stats") return handleStats(url, env);
     if (path === "/api/podcasts") return handlePodcasts(env, ctx);
     if (path === "/api/rates") return handleRates(env, ctx);
+    if (path === "/api/tr-test") return handleTrTest();
     if (path === "/api/archive") return handleArchive(url, env);
     if (path === "/api/press-covers") return handlePressCovers(env, ctx);
     if (path === "/api/press-news") return handlePressNews();
@@ -910,6 +911,8 @@ async function translateRaw(text, target) {
       if (r.ok) {
         const d = await r.json();
         out = (d && d.responseData && d.responseData.translatedText) || "";
+        /* v101: MyMemory پیام خطا (سقف روزانه/طول متن) را به‌جای ترجمه برمی‌گرداند */
+        if (/MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID LANGUAGE PAIR/i.test(out)) out = "";
       }
     } catch (e) {}
   }
@@ -955,7 +958,8 @@ async function translateGroup(texts, target, env, groupKey) {
     } catch (e) { map = {}; }
   }
 
-  const missing = list.filter(t => !map[t]);
+  /* v101: مقدارِ برابر با متن اصلی یعنی ترجمه‌ی ناموفقِ قبلی — دوباره تلاش می‌شود */
+  const missing = list.filter(t => !map[t] || map[t] === t);
   if (!missing.length) return map;
 
   let changed = false;
@@ -964,7 +968,7 @@ async function translateGroup(texts, target, env, groupKey) {
     missing.forEach((t, i) => {
       const v = done[i];
       if (v && v !== t) { map[t] = v; changed = true; }
-      else map[t] = t;
+      else delete map[t]; /* v101: شکست در کش نمی‌ماند */
     });
   } catch (e) {}
 
@@ -1389,6 +1393,68 @@ async function handleArticle(url, env, ctx, lang) {
   return renderArticlePage(post, id, url, lang, tr);
 }
 
+/* v101: ترجمه‌ی جایگزین در مرورگر خواننده — وقتی ترجمه از سمت ورکر نشد
+   (سرویس رایگان گوگل درخواست‌های سرورهای Cloudflare را گاهی رد می‌کند).
+   بندها یکی‌یکی ترجمه می‌شوند تا به سقف درخواست نخورد. */
+function articleTrScript(lang) {
+  const tl = lang === "de" ? "de" : "en";
+  return `<script>
+(function(){
+  var TL = "${tl}";
+  var els = [].slice.call(document.querySelectorAll("[data-tr]"));
+  if (!els.length) return;
+  function viaMyMemory(text){
+    return fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text.slice(0, 480)) + "&langpair=fa|" + TL)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var o = (d && d.responseData && d.responseData.translatedText) || "";
+        return /MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID LANGUAGE PAIR/i.test(o) ? "" : o;
+      })
+      .catch(function(){ return ""; });
+  }
+  function translate(text){
+    return fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=fa&tl=" + TL + "&dt=t&q=" + encodeURIComponent(text.slice(0, 1800)))
+      .then(function(r){ if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .then(function(d){ return (d && d[0]) ? d[0].map(function(s){ return s[0]; }).join("") : ""; })
+      .catch(function(){ return ""; })
+      .then(function(o){ return o || viaMyMemory(text); });
+  }
+  var i = 0;
+  (function next(){
+    if (i >= els.length) return;
+    var el = els[i++];
+    var src = el.textContent;
+    translate(src).then(function(out){
+      if (out && out !== src) {
+        el.textContent = out;
+        el.removeAttribute("dir");
+        el.removeAttribute("data-tr");
+        if (el.tagName === "H1") document.title = out + " | Pulse Iran 24";
+      }
+      next();
+    });
+  })();
+})();
+</script>`;
+}
+
+/* v101: عیب‌یابی ترجمه‌ی سمت ورکر — با یک جمله‌ی ثابت، پس هزینه یا سوءاستفاده‌ای ندارد */
+async function handleTrTest() {
+  const q = encodeURIComponent("سلام، این یک آزمایش است");
+  const out = {};
+  try {
+    const r = await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=fa&tl=de&dt=t&q=" + q);
+    out.google = { status: r.status, body: (await r.text()).slice(0, 200) };
+  } catch (e) { out.google = { error: String(e) }; }
+  try {
+    const r = await fetch("https://api.mymemory.translated.net/get?q=" + q + "&langpair=fa|de");
+    out.mymemory = { status: r.status, body: (await r.text()).slice(0, 200) };
+  } catch (e) { out.mymemory = { error: String(e) }; }
+  return new Response(JSON.stringify(out, null, 2), {
+    headers: { "Content-Type": "application/json; charset=UTF-8", "Cache-Control": "no-store" }
+  });
+}
+
 /* دریافت یک پست خاص تلگرام بر اساس شماره‌اش (برای صفحه‌ی خبری که در KV نیست) */
 async function fetchSingleTelegramPost(id) {
   const urls = [
@@ -1440,6 +1506,10 @@ function renderArticlePage(post, id, url, lang, tr) {
   const parsed = splitTitleBody(post.text);
   let title = parsed.title;
   let paragraphs = parsed.paragraphs;
+  /* v101: بخشی که ترجمه‌ی سروری ندارد علامت می‌خورد تا مرورگر ترجمه‌اش کند */
+  const needTr = t => lang !== "fa" && !!t && !(tr && tr[t] && tr[t] !== t);
+  const titleNeeds = needTr(parsed.title);
+  const paraNeeds = parsed.paragraphs.map(needTr);
   if (tr) {
     title = tr[title] || title;
     paragraphs = paragraphs.map(p => tr[p] || p);
@@ -1471,7 +1541,10 @@ function renderArticlePage(post, id, url, lang, tr) {
     mediaHtml = `<img class="art-media" src="${escHtml(absImage)}" alt="${escHtml(title)}" loading="eager">`;
   }
 
-  const bodyHtml = paragraphs.map(p => `<p>${escHtml(p)}</p>`).join("\n");
+  const bodyHtml = paragraphs.map((p, i) =>
+    paraNeeds[i] ? `<p dir="auto" data-tr="1">${escHtml(p)}</p>` : `<p>${escHtml(p)}</p>`
+  ).join("\n");
+  const trScript = (titleNeeds || paraNeeds.some(Boolean)) ? articleTrScript(lang) : "";
 
   const ld = JSON.stringify({
     "@context": "https://schema.org",
@@ -1568,7 +1641,7 @@ ${artAlt}
     <span class="badge">${escHtml(L.brand)}</span>
     <span>${escHtml(dateDisplay)}</span>
   </div>
-  <h1>${escHtml(title)}</h1>
+  <h1${titleNeeds ? ' dir="auto" data-tr="1"' : ""}>${escHtml(title)}</h1>
   ${mediaHtml}
   <div class="art-body">${bodyHtml}</div>
   <div class="actions">
@@ -1582,6 +1655,7 @@ ${artAlt}
 <footer>
   ${escHtml(L.foot)} · <a href="https://telegram.me/pulseiran24" target="_blank" rel="noopener">${escHtml(L.tgchan)}</a>
 </footer>
+${trScript}
 </body>
 </html>`;
 
