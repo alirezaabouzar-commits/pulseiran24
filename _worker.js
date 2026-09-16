@@ -1,4 +1,4 @@
-/* build: v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -1396,12 +1396,127 @@ async function handleArticle(url, env, ctx, lang) {
       const texts = [];
       if (parsed.title) texts.push(parsed.title);
       for (const p of parsed.paragraphs.slice(0, 25)) if (p && p.trim()) texts.push(p);
-      /* v82: یک کلید KV برای کل مقاله به‌جای یک کلید برای هر بند */
-      tr = await translateGroup(texts, lang, env, "art" + String(id));
+      /* v102: ترجمهٔ رایگان گوگل از سرورهای Cloudflare با 429 رد می‌شود (تأیید با /api/tr-test).
+         حالا فقط ترجمهٔ ذخیره‌شده خوانده می‌شود و بخش‌های ترجمه‌نشده در پس‌زمینه
+         با Gemini ترجمه و در همان کلید KV ذخیره می‌شوند. همین بازدید با ترجمهٔ مرورگر
+         نمایش داده می‌شود؛ بازدید بعدی (و خزندهٔ گوگل) ترجمهٔ سروری را می‌بیند. */
+      tr = await artTrCached(env, lang, id);
+      const missing = texts.some(t => !(tr && tr[t] && tr[t] !== t));
+      if (missing && ctx && ctx.waitUntil) ctx.waitUntil(artTrGemini(env, lang, id, texts, tr || {}));
     } catch (e) { tr = null; }
   }
 
   return renderArticlePage(post, id, url, lang, tr);
+}
+
+/* ---------- v102: ترجمهٔ صفحهٔ خبر با Gemini ----------
+   یک درخواست برای کل خبر (تیتر + بندها)، نتیجه در trg:<lang>:art<id> (همان کلید قبلی).
+   سقف روزانه تا سهمیهٔ رایگان Gemini برای پنل /ai-newsroom بماند؛
+   شمارنده و قفل در کش لبه‌اند، نه KV، تا put اضافه مصرف نشود. */
+const ART_TR_DAILY_CAP = 100;
+
+async function artTrCached(env, lang, id) {
+  const kv = env && env.PULSE_STATS;
+  if (!kv) return null;
+  try {
+    const raw = await kv.get("trg:" + lang + ":art" + id);
+    if (raw) { const j = JSON.parse(raw); if (j && typeof j === "object") return j; }
+  } catch (e) {}
+  return null;
+}
+
+async function artTrModels(env) {
+  const hit = await edgeGet("artTrModels");
+  if (hit) { try { const a = JSON.parse(hit); if (Array.isArray(a) && a.length) return a; } catch (e) {} }
+  const listed = await aiListModels(env);
+  if (!listed.ok || !listed.models.length) return [];
+  /* فهرست از قبل مرتب است: Flash کامل اول، Lite بعد */
+  const ids = listed.models.map(m => m.id).slice(0, 3);
+  await edgePut("artTrModels", JSON.stringify(ids), 21600);
+  return ids;
+}
+
+async function artTrCall(env, model, texts, lang) {
+  const target = lang === "de" ? "German" : "English";
+  const sys = "You translate Persian news copy published by Pulse Iran 24 into " + target + ". " +
+    "Translate every item faithfully in a neutral news-agency style. Keep names, numbers, dates, quotes and attributions exactly; " +
+    "do not add, omit, summarise or comment. Use the usual press spelling for Persian names. Keep emoji and bullet symbols. " +
+    "Return ONLY a JSON array of strings with exactly the same number of items, in the same order, as the input array.";
+  const cats = ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "HARM_CATEGORY_DANGEROUS_CONTENT", "HARM_CATEGORY_CIVIC_INTEGRITY"];
+  const bodyFor = list => JSON.stringify({
+    systemInstruction: { parts: [{ text: sys }] },
+    contents: [{ role: "user", parts: [{ text: JSON.stringify(texts) }] }],
+    safetySettings: list.map(c => ({ category: c, threshold: "BLOCK_NONE" })),
+    generationConfig: { temperature: 0.2, maxOutputTokens: 8192, responseMimeType: "application/json" }
+  });
+  async function send(bodyStr) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 25000);
+    try {
+      const r = await fetch(AI_GEMINI_BASE + "/models/" + encodeURIComponent(model) + ":generateContent", {
+        method: "POST", signal: ctl.signal,
+        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+        body: bodyStr
+      });
+      let d = null;
+      try { d = await r.json(); } catch (e) {}
+      return { status: r.status, ok: r.ok, data: d };
+    } catch (e) {
+      return { status: 0, ok: false, data: null };
+    } finally { clearTimeout(t); }
+  }
+  let res = await send(bodyFor(cats));
+  const emsg = res.data && res.data.error && res.data.error.message ? String(res.data.error.message) : "";
+  /* مثل aiDraft: اگر مدل دستهٔ CIVIC_INTEGRITY را نشناسد، بدون آن دوباره */
+  if (!res.ok && res.status === 400 && /HARM_CATEGORY|safety/i.test(emsg)) {
+    res = await send(bodyFor(cats.slice(0, 4)));
+  }
+  if (!res.ok) return { ok: false, retry: [0, 404, 429, 500, 503].indexOf(res.status) >= 0 };
+  const cand = res.data && res.data.candidates && res.data.candidates[0];
+  if (!cand || cand.finishReason === "SAFETY") return { ok: false, retry: false };
+  let text = "";
+  for (const p of (cand.content && cand.content.parts) || []) {
+    if (p && !p.thought && typeof p.text === "string") text += p.text;
+  }
+  text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  let arr = null;
+  try { arr = JSON.parse(text); } catch (e) {
+    const s = text.indexOf("["), q = text.lastIndexOf("]");
+    if (s >= 0 && q > s) { try { arr = JSON.parse(text.slice(s, q + 1)); } catch (e2) {} }
+  }
+  /* تعداد باید دقیقاً برابر باشد، وگرنه ترجمه‌ها جابه‌جا کنار بندها می‌نشینند */
+  if (!Array.isArray(arr) || arr.length !== texts.length || arr.some(x => typeof x !== "string" || !x.trim())) {
+    return { ok: false, retry: cand.finishReason === "MAX_TOKENS" };
+  }
+  return { ok: true, out: arr.map(x => x.trim()) };
+}
+
+async function artTrGemini(env, lang, id, texts, map) {
+  try {
+    if (!env || !env.GEMINI_API_KEY || !env.PULSE_STATS) return;
+    const todo = texts.filter(t => !(map[t] && map[t] !== t));
+    if (!todo.length) return;
+    /* قفل ۲ دقیقه‌ای: دو بازدید هم‌زمان یک خبر را دو بار ترجمه نکنند */
+    const lockKey = "artTrLock:" + lang + ":" + id;
+    if (await edgeGet(lockKey)) return;
+    await edgePut(lockKey, "1", 120);
+    const capKey = "artTrCount:" + new Date().toISOString().slice(0, 10);
+    const used = parseInt(await edgeGet(capKey) || "0", 10) || 0;
+    if (used >= ART_TR_DAILY_CAP) return;
+    await edgePut(capKey, String(used + 1), 90000);
+
+    const models = await artTrModels(env);
+    for (const model of models.slice(0, 2)) {
+      const res = await artTrCall(env, model, todo, lang);
+      if (res.ok) {
+        todo.forEach((t, i) => { map[t] = res.out[i]; });
+        await env.PULSE_STATS.put("trg:" + lang + ":art" + id, JSON.stringify(map), { expirationTtl: 60 * 60 * 24 * 90 });
+        return;
+      }
+      if (!res.retry) return;
+    }
+  } catch (e) { /* ترجمه نشد؛ مرورگر خواننده ترجمه می‌کند */ }
 }
 
 /* v101: ترجمه‌ی جایگزین در مرورگر خواننده — وقتی ترجمه از سمت ورکر نشد
