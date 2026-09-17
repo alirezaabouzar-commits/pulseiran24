@@ -917,6 +917,14 @@
     .btn-slim:hover{border-color:var(--pulse,#FF2D4A)}
     .btn-slim.btn-tahlil{border-color:rgba(255,45,74,.45);color:var(--pulse,#FF2D4A)}
     .btn-slim.btn-tahlil:hover{background:var(--pulse-soft,rgba(255,45,74,.12))}
+    /* v103 — دکمه پوشش زنده: فقط وقتی پوشش بازی وجود دارد نمایش داده می‌شود */
+    .btn-slim.btn-live{background:var(--pulse,#FF2D4A);border-color:var(--pulse,#FF2D4A);color:#fff}
+    .btn-slim.btn-live::before{
+      content:"";width:7px;height:7px;border-radius:50%;background:#fff;
+      animation:liveBtnPulse 1.4s ease-in-out infinite;
+    }
+    @keyframes liveBtnPulse{0%,100%{opacity:1}50%{opacity:.25}}
+    @media (prefers-reduced-motion: reduce){ .btn-slim.btn-live::before{animation:none} }
     @media(min-width:700px){header.slim-head .tagline-slim{display:inline}}
     @media(max-width:480px){header.slim-head h1{font-size:1.2rem}}
   </style>
@@ -934,6 +942,7 @@
     <div class="head-actions">
       <button class="btn-slim" id="themeToggle" aria-label="تغییر حالت روز و شب" title="حالت روز/شب">🌙</button>
       <span class="live-badge-slim" id="t-badge"><span class="live-dot"></span> پوشش زنده خبر در تلگرام</span>
+      <a class="btn-slim btn-live" href="/live" id="t-liveblog" style="display:none">پوشش زنده</a>
       <a class="btn-slim btn-tahlil" href="/tahlil" id="t-tahlil">🎧 تحلیل صوتی</a>
       <a class="btn-slim" href="/jam2026.html" id="t-livescores">⚽ نتایج زنده فوتبال</a>
       <a class="btn-slim" href="/podcast.html" id="t-podcast">🎙 پادکست</a>
@@ -1475,6 +1484,7 @@ const I18N = {
     podcast: "🎙 پادکست",
     archivelnk: "🗂 آرشیو",
     tahlil: "🎧 تحلیل صوتی",
+    liveblog: "پوشش زنده",
     football: "⚽ فوتبال زنده",
     liveBadge: "زنده",
     rooydad: "رویدادهای روز",
@@ -1550,6 +1560,7 @@ const I18N = {
     podcast: "🎙 Podcast",
     archivelnk: "🗂 Archive",
     tahlil: "🎧 Audio analysis",
+    liveblog: "Live coverage",
     football: "⚽ Live Football",
     liveBadge: "LIVE",
     rooydad: "Today's Events",
@@ -1625,6 +1636,7 @@ const I18N = {
     podcast: "🎙 Podcast",
     archivelnk: "🗂 Archiv",
     tahlil: "🎧 Audio-Analyse",
+    liveblog: "Live-Ticker",
     football: "⚽ Fußball live",
     liveBadge: "LIVE",
     rooydad: "Ereignisse des Tages",
@@ -2209,6 +2221,7 @@ function applyUI() {
     "t-cttitle": "cttitle", "t-cttext": "cttext", "t-visits": "visits", "t-intl": "intl",
     "t-livescores": "livescores", "t-podcast": "podcast", "t-archive": "archivelnk",
     "t-tahlil": "tahlil", "t-ftahlil": "tahlil", "t-fpodcast": "podcast", "t-farchive": "archivelnk",
+    "t-liveblog": "liveblog",
     "t-football": "football", "t-rooydad": "rooydad", "t-jarayed": "jarayedTitle",
     "t-sources": "sources", "t-market": "market",
     "t-l1": "l1", "t-l2": "l2", "t-l3": "l3",
@@ -2814,6 +2827,36 @@ setInterval(() => {
     });
   }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
   els.forEach(function(el){ io.observe(el); });
+})();
+
+/* ===== v103 — دکمه پوشش زنده در هدر =====
+   فقط وقتی دست‌کم یک پوشش با وضعیت open وجود داشته باشد ظاهر می‌شود.
+   اگر یک پوشش باز باشد، لینک مستقیم به همان صفحه می‌رود؛ بیش از یکی → /live
+   خطا یا پاسخ نامعتبر: دکمه پنهان می‌ماند و چیزی در کنسول نمی‌نویسد. */
+(function(){
+  var el = document.getElementById('t-liveblog');
+  if (!el || !window.fetch) return;
+  var timer = null;
+  function check(){
+    fetch('/api/live?list=1', { cache: 'no-store' })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        var open = (d && d.ok && Array.isArray(d.blogs))
+          ? d.blogs.filter(function(b){ return b && b.status === 'open'; }) : [];
+        if (!open.length) { el.style.display = 'none'; return; }
+        el.href = open.length === 1 ? ('/live/' + encodeURI(open[0].id)) : '/live';
+        el.title = open[0].title || '';
+        el.style.display = '';
+      })
+      .catch(function(){ /* بی‌صدا */ });
+  }
+  function start(){ if (!timer) timer = setInterval(check, 60000); }
+  function stop(){ if (timer) { clearInterval(timer); timer = null; } }
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden) stop(); else { check(); start(); }
+  });
+  if (document.readyState === 'complete') { check(); start(); }
+  else window.addEventListener('load', function(){ setTimeout(function(){ check(); start(); }, 800); });
 })();
 </script>
 </body>

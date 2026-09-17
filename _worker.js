@@ -1,4 +1,4 @@
-/* build: v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -231,6 +231,11 @@ async function route(request, env, ctx) {
     if (path === "/api/ai/models") return aiHandleModels(request, env);
     if (path === "/api/ai/probe")  return aiHandleProbe(request, env);
     if (path === "/api/ai/draft")  return aiHandleDraft(request, env);
+
+    /* v103 — پوشش زنده (لایو بلاگ). ترتیب مهم است: /live-admin پیش از /live */
+    if (path === "/live-admin" || path === "/live-admin/") return lbAdminPage();
+    if (path === "/api/live") return lbApi(request, env);
+    if (path === "/live" || path.startsWith("/live/")) return lbPage(request, env, url);
 
     return env.ASSETS.fetch(request);
 }
@@ -2446,6 +2451,7 @@ async function handleSitemap(url, env) {
     urls.push(`  <url><loc>${SITE_ORIGIN}/${p}</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>`);
   }
   for (const u of await tahlilSitemapUrlsI18n(env)) urls.push(u);
+  try { for (const u of await lbSitemapUrls(env)) urls.push("  " + u); } catch (e) {} /* v103 */
   for (const it of index.slice(0, 2000)) {
     const id = String(it.id || "").replace(/[^0-9]/g, "");
     if (!id) continue;
@@ -5397,3 +5403,647 @@ function aiPanelPage() {
 }
 
 /* ===================== END AI NEWSROOM MODULE ===================== */
+
+/* ============================================================================
+   PULSE IRAN 24 — LIVE BLOG MODULE  (append-only, target build v103)
+   ----------------------------------------------------------------------------
+   Routen sind in route() bereits eingetragen (v103):
+
+     if (path === "/live-admin")  return lbAdminPage();
+     if (path === "/api/live")    return lbApi(request, env);
+     if (path === "/live" || path.startsWith("/live/")) return lbPage(request, env, url);
+
+   KV-Binding: PULSE_STATS (wie gehabt).
+   KV-Budget:  1 put pro neuem Eintrag, 1 put beim Anlegen/Schliessen.
+               Alle Leseanfragen laufen ueber die Edge Cache API (20 s).
+   Alle Bezeichner tragen das Praefix lb -> keine Kollision mit bestehendem Code.
+   ========================================================================== */
+
+const LB_KEY_INDEX   = "live_index";
+const LB_MAX_ENTRIES = 300;
+const LB_MAX_BLOGS   = 30;
+const LB_EDGE_TTL    = 20;
+const LB_ORIGIN      = SITE_ORIGIN; /* aus dem bestehenden Worker */
+
+/* ---------- kleine Helfer ---------------------------------------------- */
+
+function lbEsc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function lbJson(obj, status) {
+  return new Response(JSON.stringify(obj), {
+    status: status || 200,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+  });
+}
+
+function lbSlug(s) {
+  return String(s || "").toLowerCase().trim()
+    .replace(/[^a-z0-9\u0600-\u06FF]+/g, "-")
+    .replace(/^-+|-+$/g, "").slice(0, 40) || ("live-" + Date.now());
+}
+
+function lbAdminOk(request, env) {
+  const url = new URL(request.url);
+  const t = request.headers.get("x-admin-token") || url.searchParams.get("token") || "";
+  return Boolean(env && env.ADMIN_TOKEN) && t === env.ADMIN_TOKEN;
+}
+
+function lbTehran(ts) {
+  try {
+    return new Intl.DateTimeFormat("fa-IR", {
+      timeZone: "Asia/Tehran", hour: "2-digit", minute: "2-digit"
+    }).format(new Date(ts));
+  } catch (e) {
+    const d = new Date(ts + 3.5 * 3600 * 1000);
+    const p = n => String(n).padStart(2, "0");
+    return p(d.getUTCHours()) + ":" + p(d.getUTCMinutes());
+  }
+}
+
+function lbTehranDate(ts) {
+  try {
+    return new Intl.DateTimeFormat("fa-IR", {
+      timeZone: "Asia/Tehran", day: "numeric", month: "long", year: "numeric"
+    }).format(new Date(ts));
+  } catch (e) {
+    return new Date(ts).toISOString().slice(0, 10);
+  }
+}
+
+/* ---------- Speicher ---------------------------------------------------- */
+
+async function lbEdgeGet(key) {
+  try {
+    const c = caches.default;
+    const r = await c.match(new Request(LB_ORIGIN + "/__lb/" + encodeURIComponent(key)));
+    return r ? await r.json() : null;
+  } catch (e) { return null; }
+}
+
+async function lbEdgePut(key, data) {
+  try {
+    const c = caches.default;
+    await c.put(
+      new Request(LB_ORIGIN + "/__lb/" + encodeURIComponent(key)),
+      new Response(JSON.stringify(data), {
+        headers: { "content-type": "application/json", "cache-control": "max-age=" + LB_EDGE_TTL }
+      })
+    );
+  } catch (e) { /* Cache ist optional */ }
+}
+
+async function lbRead(env, key) {
+  const hot = await lbEdgeGet(key);
+  if (hot) return hot;
+  if (!env || !env.PULSE_STATS) return null;
+  let raw = null;
+  try { raw = await env.PULSE_STATS.get(key); } catch (e) { return null; }
+  if (!raw) return null;
+  let obj = null;
+  try { obj = JSON.parse(raw); } catch (e) { return null; }
+  if (obj) await lbEdgePut(key, obj);
+  return obj;
+}
+
+async function lbWrite(env, key, obj) {
+  if (!env || !env.PULSE_STATS) throw new Error("KV binding PULSE_STATS missing");
+  await env.PULSE_STATS.put(key, JSON.stringify(obj));
+  await lbEdgePut(key, obj);
+}
+
+async function lbIndex(env) {
+  const idx = await lbRead(env, LB_KEY_INDEX);
+  return Array.isArray(idx) ? idx : [];
+}
+
+async function lbIndexUpsert(env, meta) {
+  let idx = await lbIndex(env);
+  idx = idx.filter(x => x.id !== meta.id);
+  idx.unshift(meta);
+  if (idx.length > LB_MAX_BLOGS) idx = idx.slice(0, LB_MAX_BLOGS);
+  await lbWrite(env, LB_KEY_INDEX, idx);
+  return idx;
+}
+
+/* ---------- Push (optional, nutzt vorhandenes OneSignal-Secret) ---------- */
+
+async function lbPush(env, title, url) {
+  /* nutzt den vorhandenen Helfer des Workers (ONESIGNAL_APP_ID + Secret) */
+  try {
+    const r = await sendPush(env, title, url);
+    return Boolean(r && r.ok);
+  } catch (e) { return false; }
+}
+
+/* ---------- API --------------------------------------------------------- */
+
+async function lbApi(request, env) {
+  const url = new URL(request.url);
+
+  if (request.method === "GET") {
+    if (url.searchParams.get("list") === "1") {
+      return lbJson({ ok: true, blogs: await lbIndex(env) });
+    }
+    const id = url.searchParams.get("id") || "";
+    if (!id) return lbJson({ ok: false, error: "id missing" }, 400);
+    const blog = await lbRead(env, "live:" + id);
+    if (!blog) return lbJson({ ok: false, error: "not found" }, 404);
+    const since = Number(url.searchParams.get("since") || 0);
+    const entries = since
+      ? (blog.entries || []).filter(e => e.ts > since)
+      : (blog.entries || []);
+    return lbJson({
+      ok: true, id: blog.id, title: blog.title, status: blog.status,
+      updated: blog.updated, count: (blog.entries || []).length, entries: entries
+    });
+  }
+
+  if (request.method !== "POST") return lbJson({ ok: false, error: "method" }, 405);
+  if (!lbAdminOk(request, env)) return lbJson({ ok: false, error: "unauthorized" }, 401);
+
+  let body = {};
+  try { body = await request.json(); } catch (e) { return lbJson({ ok: false, error: "bad json" }, 400); }
+  const action = String(body.action || "");
+  const now = Date.now();
+
+  if (action === "create") {
+    const title = String(body.title || "").trim();
+    if (!title) return lbJson({ ok: false, error: "title missing" }, 400);
+    const id = lbSlug(body.id || title);
+    const existing = await lbRead(env, "live:" + id);
+    if (existing) return lbJson({ ok: false, error: "id exists" }, 409);
+    const blog = {
+      id: id, title: title, summary: String(body.summary || "").trim(),
+      status: "open", created: now, updated: now, entries: []
+    };
+    await lbWrite(env, "live:" + id, blog);
+    await lbIndexUpsert(env, { id: id, title: title, status: "open", created: now, updated: now, count: 0 });
+    return lbJson({ ok: true, id: id, url: "/live/" + id });
+  }
+
+  const id = lbSlug(body.id || "");
+  if (!id) return lbJson({ ok: false, error: "id missing" }, 400);
+  const blog = await lbRead(env, "live:" + id);
+  if (!blog) return lbJson({ ok: false, error: "not found" }, 404);
+
+  if (action === "entry") {
+    const text = String(body.text || "").trim();
+    if (!text) return lbJson({ ok: false, error: "text missing" }, 400);
+    const entry = {
+      id: "e" + now,
+      ts: now,
+      text: text,
+      level: ["breaking", "confirmed", "unconfirmed", "denied", "normal"].indexOf(String(body.level)) >= 0
+        ? String(body.level) : "normal",
+      source: String(body.source || "").trim()
+    };
+    blog.entries = [entry].concat(blog.entries || []).slice(0, LB_MAX_ENTRIES);
+    blog.updated = now;
+    await lbWrite(env, "live:" + id, blog);
+    await lbIndexUpsert(env, {
+      id: blog.id, title: blog.title, status: blog.status,
+      created: blog.created, updated: now, count: blog.entries.length
+    });
+    let pushed = false;
+    if (body.push) pushed = await lbPush(env, text, LB_ORIGIN + "/live/" + id + "#" + entry.id);
+    return lbJson({ ok: true, entry: entry, pushed: pushed });
+  }
+
+  if (action === "delete-entry") {
+    const eid = String(body.entryId || "");
+    blog.entries = (blog.entries || []).filter(e => e.id !== eid);
+    blog.updated = now;
+    await lbWrite(env, "live:" + id, blog);
+    return lbJson({ ok: true, count: blog.entries.length });
+  }
+
+  if (action === "status") {
+    const st = String(body.status) === "closed" ? "closed" : "open";
+    blog.status = st;
+    blog.updated = now;
+    if (st === "closed") blog.closed = now; else delete blog.closed;
+    await lbWrite(env, "live:" + id, blog);
+    await lbIndexUpsert(env, {
+      id: blog.id, title: blog.title, status: st,
+      created: blog.created, updated: now, count: (blog.entries || []).length
+    });
+    return lbJson({ ok: true, status: st });
+  }
+
+  return lbJson({ ok: false, error: "unknown action" }, 400);
+}
+
+/* ---------- gemeinsames CSS -------------------------------------------- */
+
+const LB_CSS = `
+:root{--lb-bg:#0f1115;--lb-card:#171a20;--lb-line:#262a33;--lb-ink:#e9e9ec;
+--lb-muted:#9aa0ab;--lb-red:#e02b20;--lb-green:#39a15a;--lb-amber:#d99a1a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--lb-bg);color:var(--lb-ink);
+font-family:Vazirmatn,system-ui,Tahoma,sans-serif;line-height:1.9}
+a{color:inherit}
+.lb-wrap{max-width:760px;margin:0 auto;padding:0 14px 70px}
+.lb-top{position:sticky;top:0;z-index:5;background:rgba(15,17,21,.94);
+backdrop-filter:blur(8px);border-bottom:1px solid var(--lb-line);padding:12px 0;margin-bottom:16px}
+.lb-top .lb-in{max-width:760px;margin:0 auto;padding:0 14px;display:flex;
+align-items:center;gap:10px;flex-wrap:wrap}
+.lb-badge{display:inline-flex;align-items:center;gap:6px;background:var(--lb-red);
+color:#fff;border-radius:999px;padding:3px 11px;font-size:12.5px;font-weight:700}
+.lb-badge.off{background:#3a3f49}
+.lb-pulse{width:7px;height:7px;border-radius:50%;background:#fff;animation:lbp 1.4s infinite}
+@keyframes lbp{0%,100%{opacity:1}50%{opacity:.25}}
+h1.lb-h{font-size:21px;margin:10px 0 6px;line-height:1.6}
+.lb-sum{color:var(--lb-muted);font-size:14.5px;margin:0 0 4px}
+.lb-meta{color:var(--lb-muted);font-size:12.5px}
+.lb-feed{border-right:2px solid var(--lb-line);padding-right:16px;margin-top:22px}
+.lb-item{position:relative;background:var(--lb-card);border:1px solid var(--lb-line);
+border-radius:12px;padding:13px 14px;margin-bottom:14px}
+.lb-item::before{content:"";position:absolute;right:-23px;top:20px;width:11px;height:11px;
+border-radius:50%;background:var(--lb-line);border:2px solid var(--lb-bg)}
+.lb-item.breaking::before{background:var(--lb-red)}
+.lb-item.confirmed::before{background:var(--lb-green)}
+.lb-item.unconfirmed::before{background:var(--lb-amber)}
+.lb-item.denied::before{background:#7a8290}
+.lb-new{animation:lbn 1.6s ease-out}
+@keyframes lbn{from{background:#24303f}to{background:var(--lb-card)}}
+.lb-head{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap}
+.lb-time{font-size:13px;color:var(--lb-muted);font-variant-numeric:tabular-nums}
+.lb-tag{font-size:11.5px;border-radius:5px;padding:1px 8px;font-weight:700}
+.lb-tag.breaking{background:#3a1512;color:#ff8d82}
+.lb-tag.confirmed{background:#14301d;color:#82d69c}
+.lb-tag.unconfirmed{background:#332609;color:#e8c46a}
+.lb-tag.denied{background:#23262c;color:#aeb5c0}
+.lb-text{margin:0;white-space:pre-wrap;word-wrap:break-word;font-size:15.5px}
+.lb-src{margin:8px 0 0;font-size:12.5px;color:var(--lb-muted)}
+.lb-link{border:0;background:none;color:var(--lb-muted);font-family:inherit;
+font-size:12.5px;cursor:pointer;padding:0;margin-top:8px}
+.lb-link:hover{color:var(--lb-ink)}
+.lb-empty{color:var(--lb-muted);text-align:center;padding:40px 0}
+.lb-new-bar{position:fixed;top:64px;left:0;right:0;display:none;justify-content:center;z-index:9}
+.lb-new-bar button{background:var(--lb-red);color:#fff;border:0;border-radius:999px;
+padding:9px 20px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;
+box-shadow:0 6px 20px rgba(0,0,0,.45)}
+.lb-list a{display:block;background:var(--lb-card);border:1px solid var(--lb-line);
+border-radius:12px;padding:14px;margin-bottom:12px;text-decoration:none}
+.lb-list h3{margin:0 0 6px;font-size:16.5px}
+:target .lb-item,.lb-item:target{outline:2px solid var(--lb-red)}
+`;
+
+/* ---------- Client-Skript ---------------------------------------------- */
+
+function lbClientScript(id, lastTs) {
+  return `
+(function(){
+  var ID=${JSON.stringify(id)}, since=${Number(lastTs) || 0}, pending=[], timer=null, fails=0;
+  var feed=document.getElementById('lbFeed'), bar=document.getElementById('lbNewBar'),
+      barBtn=document.getElementById('lbNewBtn'), upd=document.getElementById('lbUpdated');
+
+  function rel(ts){
+    var s=Math.floor((Date.now()-ts)/1000);
+    if(s<60) return 'همین الان';
+    if(s<3600) return Math.floor(s/60)+' دقیقه پیش';
+    if(s<86400) return Math.floor(s/3600)+' ساعت پیش';
+    return Math.floor(s/86400)+' روز پیش';
+  }
+  function fa(n){return String(n).replace(/[0-9]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'[d]});}
+  function ticks(){
+    [].forEach.call(document.querySelectorAll('.lb-time[data-ts]'),function(el){
+      el.textContent = fa(rel(Number(el.getAttribute('data-ts'))));
+    });
+  }
+  var TAGS={breaking:'فوری',confirmed:'تأییدشده',unconfirmed:'تأییدنشده',denied:'رد شد'};
+  function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+  function node(e){
+    var d=document.createElement('article');
+    d.className='lb-item lb-new '+e.level; d.id=e.id;
+    var tag = TAGS[e.level] ? '<span class="lb-tag '+e.level+'">'+TAGS[e.level]+'</span>' : '';
+    d.innerHTML='<div class="lb-head"><span class="lb-time" data-ts="'+e.ts+'"></span>'+tag+'</div>'+
+      '<p class="lb-text">'+esc(e.text)+'</p>'+
+      (e.source?'<p class="lb-src">📌 منبع: '+esc(e.source)+'</p>':'')+
+      '<button class="lb-link" data-anchor="'+e.id+'">کپی لینک این بند</button>';
+    return d;
+  }
+  function flush(){
+    pending.reverse().forEach(function(e){ feed.insertBefore(node(e), feed.firstChild); });
+    pending=[]; bar.style.display='none'; ticks();
+  }
+  barBtn.addEventListener('click',function(){ flush(); window.scrollTo({top:0,behavior:'smooth'}); });
+
+  document.addEventListener('click',function(ev){
+    var b=ev.target.closest('.lb-link'); if(!b) return;
+    var u=location.origin+location.pathname+'#'+b.getAttribute('data-anchor');
+    (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject())
+      .then(function(){b.textContent='لینک کپی شد ✓';setTimeout(function(){b.textContent='کپی لینک این بند';},1500);})
+      .catch(function(){ prompt('لینک این بند:', u); });
+  });
+
+  function poll(){
+    fetch('/api/live?id='+encodeURIComponent(ID)+'&since='+since,{cache:'no-store'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        fails=0;
+        if(d && d.ok){
+          if(d.updated && upd) upd.textContent='آخرین به‌روزرسانی: '+fa(rel(d.updated));
+          if(d.entries && d.entries.length){
+            since=Math.max.apply(null,d.entries.map(function(e){return e.ts;}));
+            pending=d.entries.concat(pending);
+            if(window.scrollY<80){ flush(); }
+            else { bar.style.display='flex';
+                   barBtn.textContent=fa(pending.length)+' بند تازه'; }
+          }
+          if(d.status==='closed' && timer){ clearInterval(timer); timer=null; }
+        }
+      })
+      .catch(function(){ fails++; if(fails>5 && timer){clearInterval(timer);timer=null;} });
+  }
+  function start(){ if(!timer) timer=setInterval(poll,20000); }
+  function stop(){ if(timer){clearInterval(timer);timer=null;} }
+  document.addEventListener('visibilitychange',function(){ document.hidden?stop():(poll(),start()); });
+  ticks(); setInterval(ticks,30000);
+  if(${JSON.stringify(String(id))} && document.body.dataset.status==='open'){ start(); }
+})();`;
+}
+
+/* ---------- Seite: Liste + einzelner Live-Blog -------------------------- */
+
+const LB_TAGS = { breaking: "فوری", confirmed: "تأییدشده", unconfirmed: "تأییدنشده", denied: "رد شد" };
+
+function lbEntryHtml(e) {
+  const tag = LB_TAGS[e.level]
+    ? '<span class="lb-tag ' + e.level + '">' + LB_TAGS[e.level] + "</span>" : "";
+  return '<article class="lb-item ' + lbEsc(e.level) + '" id="' + lbEsc(e.id) + '">' +
+    '<div class="lb-head"><span class="lb-time" data-ts="' + Number(e.ts) + '">' +
+      lbEsc(lbTehran(e.ts)) + "</span>" + tag + "</div>" +
+    '<p class="lb-text">' + lbEsc(e.text) + "</p>" +
+    (e.source ? '<p class="lb-src">📌 منبع: ' + lbEsc(e.source) + "</p>" : "") +
+    '<button class="lb-link" data-anchor="' + lbEsc(e.id) + '">کپی لینک این بند</button>' +
+    "</article>";
+}
+
+function lbShell(title, inner, extraHead, bodyAttrs) {
+  return '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    "<title>" + lbEsc(title) + "</title>" +
+    '<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">' +
+    "<style>" + LB_CSS + "</style>" + (extraHead || "") +
+    "</head><body " + (bodyAttrs || "") + ">" + inner + "</body></html>";
+}
+
+async function lbListPage(env) {
+  const idx = await lbIndex(env);
+  const items = idx.length
+    ? idx.map(b =>
+        '<a href="/live/' + lbEsc(b.id) + '">' +
+        '<h3>' + lbEsc(b.title) + "</h3>" +
+        '<div class="lb-meta">' +
+          (b.status === "open" ? "در حال پیگیری" : "بسته‌شده") + " · " +
+          lbEsc(lbTehranDate(b.updated)) + "</div></a>").join("")
+    : '<p class="lb-empty">هنوز پوشش زنده‌ای منتشر نشده است.</p>';
+  const inner = '<div class="lb-top"><div class="lb-in">' +
+    '<a href="/" style="text-decoration:none">→ پالس ایران ۲۴</a>' +
+    "</div></div>" +
+    '<div class="lb-wrap"><h1 class="lb-h">پوشش زنده</h1>' +
+    '<div class="lb-list">' + items + "</div></div>";
+  return new Response(lbShell("پوشش زنده | پالس ایران ۲۴", inner), {
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60" }
+  });
+}
+
+async function lbPage(request, env, url) {
+  const path = url.pathname.replace(/\/+$/, "");
+  if (path === "/live") return lbListPage(env);
+
+  const id = lbSlug(decodeURIComponent(path.slice("/live/".length)));
+  const blog = await lbRead(env, "live:" + id);
+  if (!blog) {
+    const inner = '<div class="lb-wrap"><p class="lb-empty">این پوشش زنده یافت نشد.' +
+      '<br><a href="/live">فهرست پوشش‌های زنده</a></p></div>';
+    return new Response(lbShell("یافت نشد | پالس ایران ۲۴", inner), {
+      status: 404,
+      headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex" }
+    });
+  }
+
+  const entries = blog.entries || [];
+  const open = blog.status === "open";
+  const lastTs = entries.length ? entries[0].ts : blog.created;
+
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": "LiveBlogPosting",
+    headline: String(blog.title).slice(0, 110),
+    description: blog.summary || String(blog.title).slice(0, 160),
+    url: LB_ORIGIN + "/live/" + blog.id,
+    datePublished: new Date(blog.created).toISOString(),
+    dateModified: new Date(blog.updated).toISOString(),
+    coverageStartTime: new Date(blog.created).toISOString(),
+    inLanguage: "fa",
+    publisher: { "@type": "Organization", name: "Pulse Iran 24", url: LB_ORIGIN },
+    liveBlogUpdate: entries.slice(0, 25).map(e => ({
+      "@type": "BlogPosting",
+      headline: String(e.text).slice(0, 110),
+      articleBody: e.text,
+      datePublished: new Date(e.ts).toISOString(),
+      url: LB_ORIGIN + "/live/" + blog.id + "#" + e.id
+    }))
+  };
+  if (!open && blog.closed) ld.coverageEndTime = new Date(blog.closed).toISOString();
+
+  const head =
+    '<meta name="description" content="' + lbEsc(blog.summary || blog.title) + '">' +
+    '<link rel="canonical" href="' + LB_ORIGIN + "/live/" + lbEsc(blog.id) + '">' +
+    '<meta property="og:type" content="article">' +
+    '<meta property="og:title" content="' + lbEsc(blog.title) + '">' +
+    '<meta property="og:description" content="' + lbEsc(blog.summary || blog.title) + '">' +
+    '<meta property="og:url" content="' + LB_ORIGIN + "/live/" + lbEsc(blog.id) + '">' +
+    '<meta property="og:image" content="' + LB_ORIGIN + '/logo.png">' +
+    '<script type="application/ld+json">' + JSON.stringify(ld).replace(/</g, "\\u003c") + "<\/script>";
+
+  const inner =
+    '<div class="lb-top"><div class="lb-in">' +
+      '<a href="/" style="text-decoration:none">→ پالس ایران ۲۴</a>' +
+      '<span class="lb-badge' + (open ? "" : " off") + '">' +
+        (open ? '<span class="lb-pulse"></span>زنده' : "پایان پوشش") + "</span>" +
+      '<span class="lb-meta" id="lbUpdated"></span>' +
+    "</div></div>" +
+    '<div class="lb-new-bar" id="lbNewBar"><button id="lbNewBtn">بند تازه</button></div>' +
+    '<div class="lb-wrap">' +
+      '<h1 class="lb-h">' + lbEsc(blog.title) + "</h1>" +
+      (blog.summary ? '<p class="lb-sum">' + lbEsc(blog.summary) + "</p>" : "") +
+      '<div class="lb-meta">آغاز پوشش: ' + lbEsc(lbTehranDate(blog.created)) +
+        " · " + lbEsc(String(entries.length)) + " بند</div>" +
+      '<div class="lb-feed" id="lbFeed">' +
+        (entries.length ? entries.map(lbEntryHtml).join("")
+                        : '<p class="lb-empty">هنوز بندی ثبت نشده است.</p>') +
+      "</div>" +
+    "</div>" +
+    "<script>" + lbClientScript(blog.id, lastTs) + "<\/script>";
+
+  return new Response(
+    lbShell(blog.title + " | پالس ایران ۲۴", inner, head, 'data-status="' + (open ? "open" : "closed") + '"'),
+    { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=15" } }
+  );
+}
+
+/* ---------- Admin-Panel ------------------------------------------------- */
+
+function lbAdminPage() {
+  const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>پنل پوشش زنده</title>
+<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">
+<style>${LB_CSS}
+.lb-f{background:var(--lb-card);border:1px solid var(--lb-line);border-radius:12px;padding:14px;margin-bottom:14px}
+label{display:block;font-size:12.5px;color:var(--lb-muted);margin:10px 0 5px}
+input,textarea,select{width:100%;background:#0f1115;color:var(--lb-ink);border:1px solid var(--lb-line);
+border-radius:9px;padding:10px;font-family:inherit;font-size:15px}
+textarea{min-height:110px;resize:vertical;line-height:1.9}
+button.b{border:0;border-radius:9px;background:var(--lb-red);color:#fff;font-family:inherit;
+font-weight:700;font-size:15px;padding:11px 18px;cursor:pointer;margin-top:12px}
+button.g{background:#2a2f38}
+.msg{font-size:13.5px;margin-top:10px;min-height:20px}
+.ok{color:#82d69c}.no{color:#ff8d82}
+.rowf{display:flex;gap:10px;flex-wrap:wrap}.rowf>div{flex:1 1 150px}
+</style></head><body><div class="lb-wrap">
+<h1 class="lb-h">پنل پوشش زنده</h1>
+
+<div class="lb-f">
+  <label>توکن مدیریت</label>
+  <input id="tok" type="password" placeholder="ADMIN_TOKEN">
+  <button class="b g" id="save">ذخیره در این مرورگر</button>
+</div>
+
+<div class="lb-f">
+  <h3 style="margin:0 0 4px">۱. پوشش زنده</h3>
+  <label>انتخاب پوشش موجود</label>
+  <select id="sel"><option value="">— در حال بارگذاری —</option></select>
+  <div class="rowf">
+    <div><label>یا عنوان پوشش تازه</label><input id="ntitle" placeholder="حمله به تنگهٔ هرمز"></div>
+    <div><label>توضیح کوتاه (اختیاری)</label><input id="nsum"></div>
+    <div><label>شناسهٔ لاتین برای آدرس (اختیاری)</label><input id="nid" placeholder="hormoz-2026-09-18"></div>
+  </div>
+  <button class="b" id="create">ساخت پوشش تازه</button>
+  <button class="b g" id="close">بستن این پوشش</button>
+  <div class="msg" id="m1"></div>
+</div>
+
+<div class="lb-f">
+  <h3 style="margin:0 0 4px">۲. افزودن بند</h3>
+  <label>متن بند (متن ساده، بدون HTML)</label>
+  <textarea id="txt" placeholder="یک تا سه جملهٔ کامل خبری با ذکر منبع"></textarea>
+  <div class="rowf">
+    <div><label>وضعیت</label>
+      <select id="lvl">
+        <option value="normal">بدون برچسب</option>
+        <option value="breaking">فوری</option>
+        <option value="confirmed">تأییدشده</option>
+        <option value="unconfirmed">تأییدنشده</option>
+        <option value="denied">رد شد</option>
+      </select></div>
+    <div><label>منبع</label><input id="src" placeholder="رویترز"></div>
+  </div>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:12px">
+    <input type="checkbox" id="push" style="width:auto"> ارسال اعلان پوش (فقط برای خبر فوری واقعی)
+  </label>
+  <button class="b" id="add">ثبت بند</button>
+  <div class="msg" id="m2"></div>
+</div>
+
+<div class="lb-f">
+  <h3 style="margin:0 0 8px">۳. بندهای اخیر</h3>
+  <div id="recent" class="lb-meta">—</div>
+</div>
+
+</div><script>
+var $=function(i){return document.getElementById(i)};
+var tok=localStorage.getItem('lbTok')||''; $('tok').value=tok;
+$('save').onclick=function(){tok=$('tok').value.trim();localStorage.setItem('lbTok',tok);say('m1','ذخیره شد',1)};
+function say(id,t,ok){var e=$(id);e.textContent=t;e.className='msg '+(ok?'ok':'no')}
+function post(b){return fetch('/api/live',{method:'POST',
+  headers:{'content-type':'application/json','x-admin-token':tok},body:JSON.stringify(b)})
+  .then(function(r){return r.json()})}
+
+function loadList(){
+  fetch('/api/live?list=1',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
+    var s=$('sel'); s.innerHTML='';
+    (d.blogs||[]).forEach(function(b){
+      var o=document.createElement('option'); o.value=b.id;
+      o.textContent=b.title+(b.status==='open'?' — زنده':' — بسته');
+      s.appendChild(o);
+    });
+    if(!s.options.length){var o=document.createElement('option');o.value='';o.textContent='— هنوز پوششی ساخته نشده —';s.appendChild(o)}
+    loadRecent();
+  });
+}
+function loadRecent(){
+  var id=$('sel').value; if(!id){$('recent').textContent='—';return}
+  fetch('/api/live?id='+encodeURIComponent(id),{cache:'no-store'})
+   .then(function(r){return r.json()}).then(function(d){
+     var w=$('recent'); w.innerHTML='';
+     (d.entries||[]).slice(0,10).forEach(function(e){
+       var row=document.createElement('div');
+       row.style.cssText='border-bottom:1px solid var(--lb-line);padding:8px 0';
+       row.innerHTML='<div style="font-size:14px;color:var(--lb-ink)"></div>';
+       row.firstChild.textContent=e.text.slice(0,120);
+       var del=document.createElement('button');
+       del.className='lb-link'; del.textContent='حذف';
+       del.onclick=function(){ if(!confirm('حذف این بند؟'))return;
+         post({action:'delete-entry',id:id,entryId:e.id}).then(loadRecent)};
+       row.appendChild(del); w.appendChild(row);
+     });
+     if(!(d.entries||[]).length) w.textContent='بندی ثبت نشده است.';
+   });
+}
+$('sel').onchange=loadRecent;
+
+$('create').onclick=function(){
+  var t=$('ntitle').value.trim(); if(!t){say('m1','عنوان را بنویسید');return}
+  post({action:'create',title:t,summary:$('nsum').value.trim(),id:$('nid').value.trim()||undefined}).then(function(d){
+    if(d.ok){say('m1','ساخته شد: '+d.url,1);$('ntitle').value='';$('nsum').value='';$('nid').value='';loadList()}
+    else say('m1','خطا: '+(d.error||''));
+  });
+};
+$('close').onclick=function(){
+  var id=$('sel').value; if(!id)return;
+  if(!confirm('این پوشش بسته شود؟'))return;
+  post({action:'status',id:id,status:'closed'}).then(function(d){
+    d.ok?say('m1','بسته شد',1):say('m1','خطا: '+(d.error||'')); loadList();
+  });
+};
+$('add').onclick=function(){
+  var id=$('sel').value, t=$('txt').value.trim();
+  if(!id){say('m2','اول یک پوشش انتخاب کنید');return}
+  if(!t){say('m2','متن بند خالی است');return}
+  post({action:'entry',id:id,text:t,level:$('lvl').value,source:$('src').value.trim(),push:$('push').checked})
+  .then(function(d){
+    if(d.ok){say('m2','ثبت شد'+(d.pushed?' + پوش ارسال شد':''),1);
+      $('txt').value='';$('push').checked=false;$('lvl').value='normal';loadRecent()}
+    else say('m2','خطا: '+(d.error||''));
+  });
+};
+loadList();
+<\/script></body></html>`;
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex, nofollow"
+    }
+  });
+}
+
+/* ---------- Sitemap-Helfer (optional) ----------------------------------- */
+
+async function lbSitemapUrls(env) {
+  const idx = await lbIndex(env);
+  /* gibt ein ARRAY zurueck — handleSitemap iteriert mit for...of */
+  return idx.map(b =>
+    "<url><loc>" + LB_ORIGIN + "/live/" + encodeURI(b.id) + "</loc><lastmod>" +
+    new Date(b.updated).toISOString() + "</lastmod><changefreq>" +
+    (b.status === "open" ? "hourly" : "monthly") + "</changefreq></url>");
+}
