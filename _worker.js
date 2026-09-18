@@ -1,4 +1,4 @@
-/* build: v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -236,6 +236,14 @@ async function route(request, env, ctx) {
     if (path === "/live-admin" || path === "/live-admin/") return lbAdminPage();
     if (path === "/api/live") return lbApi(request, env);
     if (path === "/live" || path.startsWith("/live/")) return lbPage(request, env, url);
+
+    /* v104 — میز هشدار AI: اسکن زمان‌بندی‌شده + تأیید در تلگرام */
+    if (path === "/api/ax/scan")   return axHandleScan(request, env);
+    if (path === "/api/ax/tg")     return axHandleTg(request, env);
+    if (path === "/api/ax/setup")  return axHandleSetup(request, env);
+    if (path === "/api/ax/status") return axHandleStatus(request, env);
+    if (path === "/api/ax/draft")  return axHandleDraft(request, env);
+    if (path === "/ax-edit" || path === "/ax-edit/") return axEditPage();
 
     return env.ASSETS.fetch(request);
 }
@@ -6046,4 +6054,651 @@ async function lbSitemapUrls(env) {
     "<url><loc>" + LB_ORIGIN + "/live/" + encodeURI(b.id) + "</loc><lastmod>" +
     new Date(b.updated).toISOString() + "</lastmod><changefreq>" +
     (b.status === "open" ? "hourly" : "monthly") + "</changefreq></url>");
+}
+
+
+/* ============================================================================
+   PULSE IRAN 24 — AI ALERT DESK  (append-only, build v104, همه با پیشوند ax)
+   AI خودکار خبرهای ایران را از فیدهای /ai-newsroom پیدا می‌کند، پوشش چندمنبعی
+   را می‌سنجد، پیش‌نویس فارسی می‌نویسد و در تلگرام خصوصی سردبیر با دکمهٔ
+   انتشار/ویرایش/رد هشدار می‌دهد. هیچ چیز بدون تأیید انسان منتشر نمی‌شود.
+
+   مسیرها (در route() ثبت شده‌اند):
+     POST /api/ax/scan    ← Worker زمان‌بند (هدر x-scan-key) یا ?token=ADMIN_TOKEN برای تست دستی
+     POST /api/ax/tg      ← وبهوک تلگرام (هدر مخفی + بررسی Chat ID)
+     GET  /api/ax/setup   ← یک‌بار: ثبت وبهوک در تلگرام (?token=ADMIN_TOKEN)
+     GET  /api/ax/status  ← وضعیت (?token=ADMIN_TOKEN)
+     GET/POST /api/ax/draft ← خواندن/انتشار/رد پیش‌نویس از صفحهٔ ویرایش
+     GET  /ax-edit?id=…   ← صفحهٔ ویرایش (noindex، پشت توکن)
+
+   Secretها: GEMINI_API_KEY، TELEGRAM_BOT_TOKEN، TELEGRAM_CHAT_ID، ADMIN_TOKEN (همه موجود)
+             + SCAN_KEY (جدید — همان مقدار در Worker زمان‌بند)
+   KV: فقط یک کلید ax_state؛ هر اسکن حداکثر ۱ نوشتن و فقط وقتی چیزی عوض شده.
+============================================================================ */
+
+const AX_STATE_KEY = "ax_state";
+const AX_MIN_IMPORTANCE = 3;      // زیر این اهمیت هشدار نمی‌آید
+const AX_MAX_DRAFTS = 2;          // حداکثر پیش‌نویس در هر اسکن (زمان و سهمیهٔ Gemini)
+const AX_DAILY_GEMINI_CAP = 150;  // سقف روزانهٔ فراخوانی Gemini از این ماژول
+const AX_SEEN_CAP = 600;
+const AX_PENDING_TTL = 12 * 3600 * 1000;
+const AX_LOG_CAP = 100;           // خبرهای منتشرشده با شهر — برای نقشهٔ بعدی
+
+const AX_SOURCE_FA = {
+  "Guardian": "گاردین",
+  "Al Jazeera": "الجزیره",
+  "BBC": "بی‌بی‌سی",
+  "DW": "دویچه‌وله",
+  "France 24": "فرانس ۲۴",
+  "Times of Israel": "تایمز اسرائیل"
+};
+
+/* ------------------------------------------------------------ helpers */
+
+function axJson(obj, status) {
+  return new Response(JSON.stringify(obj), {
+    status: status || 200,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" }
+  });
+}
+
+function axFa(n) {
+  return String(n).replace(/\d/g, function (d) { return "۰۱۲۳۴۵۶۷۸۹"[d]; });
+}
+
+function axKey(link) {
+  return String(link || "").split("?")[0].split("#")[0].slice(0, 300);
+}
+
+function axId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function axAdminOk(request, env) {
+  const want = env && env.ADMIN_TOKEN;
+  if (!want) return false;
+  const url = new URL(request.url);
+  const h = request.headers.get("authorization") || "";
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  const got = (m ? m[1] : "") || request.headers.get("x-admin-token") || url.searchParams.get("token") || "";
+  return !!got && timingSafeEqual(got.trim(), want);
+}
+
+function axScanOk(request, env) {
+  const k = request.headers.get("x-scan-key") || "";
+  if (env && env.SCAN_KEY && k && timingSafeEqual(k, env.SCAN_KEY)) return true;
+  return axAdminOk(request, env);
+}
+
+/* رمز وبهوک از توکن ربات ساخته می‌شود تا Secret جدیدی لازم نباشد */
+async function axHookSecret(env) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("ax-hook:" + env.TELEGRAM_BOT_TOKEN));
+  return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("").slice(0, 48);
+}
+
+async function axLoad(env) {
+  let s = null;
+  try { s = JSON.parse(await env.PULSE_STATS.get(AX_STATE_KEY) || "null"); } catch (e) { s = null; }
+  if (!s || typeof s !== "object") s = { fresh: true };
+  if (!Array.isArray(s.seen)) s.seen = [];
+  if (!s.pending || typeof s.pending !== "object") s.pending = {};
+  if (!Array.isArray(s.log)) s.log = [];
+  return s;
+}
+
+async function axSave(env, s) {
+  delete s.fresh;
+  if (s.seen.length > AX_SEEN_CAP) s.seen = s.seen.slice(-AX_SEEN_CAP);
+  if (s.log.length > AX_LOG_CAP) s.log = s.log.slice(0, AX_LOG_CAP);
+  const now = Date.now();
+  for (const id in s.pending) {
+    if (now - (s.pending[id].ts || 0) > AX_PENDING_TTL) delete s.pending[id];
+  }
+  await env.PULSE_STATS.put(AX_STATE_KEY, JSON.stringify(s));
+}
+
+/* شمارندهٔ روزانه در کش لبه، مثل v102 — بدون نوشتن در KV */
+async function axBudget(n) {
+  const k = "axGem:" + new Date().toISOString().slice(0, 10);
+  const used = parseInt(await edgeGet(k) || "0", 10) || 0;
+  if (used + n > AX_DAILY_GEMINI_CAP) return false;
+  await edgePut(k, String(used + n), 90000);
+  return true;
+}
+
+async function axTg(env, method, payload) {
+  try {
+    const r = await fetch("https://api.telegram.org/bot" + env.TELEGRAM_BOT_TOKEN + "/" + method, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    return await r.json().catch(function () { return { ok: false }; });
+  } catch (e) {
+    return { ok: false, description: "network" };
+  }
+}
+
+/* ------------------------------------------------------ triage (Gemini) */
+
+function axTriagePrompt() {
+  return [
+    "You are the triage desk of «Pulse Iran 24», a Persian-language news site that covers ONLY Iran.",
+    "You receive numbered items from international outlets. Items marked NEW arrived since the last check.",
+    "",
+    "Tasks:",
+    "1. Group items that report the SAME concrete event.",
+    "2. Keep only groups that are directly about Iran: Iranian state, military, nuclear programme, economy, people, protests, executions,",
+    "   or the Iran–US / Iran–Israel confrontation. Regional stories count only when Iran is central.",
+    "3. Keep only groups that contain at least one NEW item.",
+    "",
+    "For each kept group return:",
+    "- items: the item numbers in the group",
+    "- importance: 1–5 (5 = strikes, war, mass casualties, nuclear; 4 = major security or political move; 3 = significant; 1–2 = minor)",
+    "- headline_fa: short neutral Persian headline",
+    "- city_fa: the Iranian city or province where it happened, in Persian, or \"\" if not in Iran or unknown",
+    "- origin_fa: who is the ORIGINAL source of the core claim, in Persian. Examples: «ارتش اسرائیل»، «سپاه پاسداران»، «مقام‌های ایرانی»،",
+    "  «مقام‌های آمریکایی»، «سنتکام»، «گزارش مستقل خبرنگاران»، «شبکه‌های اجتماعی»، «نامشخص».",
+    "  Several outlets relaying the same statement share ONE origin. Never name Iranian domestic news agencies — write «مقام‌های ایرانی» instead.",
+    "- independent: true ONLY if at least one outlet reports its own reporting, eyewitnesses, or independent verification",
+    "  (satellite imagery, geolocated footage, own correspondent) rather than relaying a party's claim. Otherwise false.",
+    "- conflict_fa: \"\" or one short Persian sentence describing factual contradictions between the items (numbers, timing, responsibility).",
+    "",
+    "Never mention or use the MEK / NCRI (مجاهدین خلق) in any field.",
+    "Return ONLY raw JSON, no code fences: {\"groups\":[{\"items\":[0,3],\"importance\":4,\"headline_fa\":\"…\",\"city_fa\":\"…\",\"origin_fa\":\"…\",\"independent\":false,\"conflict_fa\":\"\"}]}",
+    "If nothing qualifies return {\"groups\":[]}."
+  ].join("\n");
+}
+
+async function axGeminiJson(env, model, system, user) {
+  const cats = ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "HARM_CATEGORY_DANGEROUS_CONTENT", "HARM_CATEGORY_CIVIC_INTEGRITY"];
+  const bodyFor = function (list) {
+    return JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: "user", parts: [{ text: user }] }],
+      safetySettings: list.map(function (c) { return { category: c, threshold: "BLOCK_NONE" }; }),
+      generationConfig: { temperature: 0.1, maxOutputTokens: 8000, responseMimeType: "application/json" }
+    });
+  };
+  async function send(b) {
+    const ctl = new AbortController();
+    const t = setTimeout(function () { ctl.abort(); }, 45000);
+    try {
+      const r = await fetch(AI_GEMINI_BASE + "/models/" + encodeURIComponent(model) + ":generateContent", {
+        method: "POST", signal: ctl.signal,
+        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+        body: b
+      });
+      let d = null;
+      try { d = await r.json(); } catch (e) {}
+      return { status: r.status, ok: r.ok, data: d };
+    } catch (e) {
+      return { status: 0, ok: false, data: null };
+    } finally { clearTimeout(t); }
+  }
+  let res = await send(bodyFor(cats));
+  const emsg = res.data && res.data.error && res.data.error.message ? String(res.data.error.message) : "";
+  if (!res.ok && res.status === 400 && /HARM_CATEGORY|safety/i.test(emsg)) res = await send(bodyFor(cats.slice(0, 4)));
+  if (!res.ok) return { ok: false, busy: [0, 429, 500, 503].indexOf(res.status) >= 0, error: "http_" + res.status };
+  const cand = res.data && res.data.candidates && res.data.candidates[0];
+  if (!cand) return { ok: false, error: "no_candidate" };
+  let text = "";
+  for (const p of (cand.content && cand.content.parts) || []) {
+    if (p && !p.thought && typeof p.text === "string") text += p.text;
+  }
+  text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  let parsed = null;
+  try { parsed = JSON.parse(text); } catch (e) {
+    const s = text.indexOf("{"), q = text.lastIndexOf("}");
+    if (s >= 0 && q > s) { try { parsed = JSON.parse(text.slice(s, q + 1)); } catch (e2) {} }
+  }
+  if (!parsed) return { ok: false, busy: cand.finishReason === "MAX_TOKENS", error: "unparsable" };
+  return { ok: true, data: parsed };
+}
+
+/* خروجی مدل را سخت‌گیرانه اعتبارسنجی می‌کند — شمارش منابع کار کد است، نه مدل */
+function axCleanGroups(raw, items, newSet) {
+  const out = [];
+  const groups = raw && Array.isArray(raw.groups) ? raw.groups : [];
+  const used = {};
+  for (const g of groups) {
+    if (!g || !Array.isArray(g.items)) continue;
+    const idx = [];
+    for (const n of g.items) {
+      const i = parseInt(n, 10);
+      if (i >= 0 && i < items.length && !used[i] && idx.indexOf(i) < 0) idx.push(i);
+    }
+    if (!idx.length) continue;
+    if (!idx.some(function (i) { return newSet[i]; })) continue;
+    idx.forEach(function (i) { used[i] = 1; });
+    let imp = parseInt(g.importance, 10);
+    if (!(imp >= 1 && imp <= 5)) imp = 1;
+    const clean = function (v, cap) {
+      return String(v || "").replace(/مجاهدین|MEK|NCRI/gi, "").replace(/\s+/g, " ").trim().slice(0, cap);
+    };
+    out.push({
+      idx: idx,
+      importance: imp,
+      headline: clean(g.headline_fa, 140),
+      city: clean(g.city_fa, 40),
+      origin: clean(g.origin_fa, 60) || "نامشخص",
+      independent: g.independent === true,
+      conflict: clean(g.conflict_fa, 200)
+    });
+  }
+  out.sort(function (a, b) { return b.importance - a.importance; });
+  return out;
+}
+
+function axSourcesOf(group, items) {
+  const names = [];
+  for (const i of group.idx) {
+    const fa = AX_SOURCE_FA[items[i].source] || items[i].source || "";
+    if (fa && names.indexOf(fa) < 0) names.push(fa);
+  }
+  return names;
+}
+
+function axCoverageLines(names, origin, independent, conflict) {
+  const cov = names.length > 1
+    ? "گزارش‌شده در " + axFa(names.length) + " رسانه: " + names.join("، ")
+    : "تک‌منبعی: " + (names[0] || "نامشخص");
+  const lines = ["📊 پوشش: " + cov + " · منبع اصلی ادعا: " + origin + " · تأیید مستقل: " + (independent ? "دارد" : "ندارد")];
+  if (conflict) lines.push("⚠️ تناقض میان گزارش‌ها: " + conflict);
+  return lines;
+}
+
+const AX_AI_NOTE = "🤖 این خبر با کمک هوش مصنوعی تهیه و پیش از انتشار توسط سردبیر بازبینی شده است.";
+
+/* ------------------------------------------------------------ the scan */
+
+async function axHandleScan(request, env) {
+  if (!axScanOk(request, env)) return axJson({ ok: false, error: "unauthorized" }, 401);
+  if (!env.PULSE_STATS) return axJson({ ok: false, error: "kv_missing" }, 503);
+  if (!env.GEMINI_API_KEY || !env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
+    return axJson({ ok: false, error: "missing_secret" }, 503);
+  }
+
+  /* قفل ۴ دقیقه‌ای: دو اسکن هم‌زمان دو هشدار تکراری نسازند */
+  if (await edgeGet("axScanLock")) return axJson({ ok: true, skipped: "locked" });
+  await edgePut("axScanLock", "1", 240);
+
+  const state = await axLoad(env);
+  const feeds = await aiFetchFeeds();
+  const items = (feeds && feeds.items) || [];
+  const report = { ok: true, items: items.length, fresh: 0, groups: 0, alerts: 0, updates: 0, errors: [] };
+  if (!items.length) return axJson(report);
+
+  const seenSet = {};
+  state.seen.forEach(function (k) { seenSet[k] = 1; });
+  const newSet = {};
+  items.forEach(function (it, i) { if (!seenSet[axKey(it.link)]) newSet[i] = 1; });
+  report.fresh = Object.keys(newSet).length;
+
+  /* اجرای اول: همهٔ خبرهای موجود «دیده‌شده» ثبت می‌شوند تا سیلی از هشدارهای قدیمی نیاید */
+  if (state.fresh) {
+    state.seen = items.map(function (it) { return axKey(it.link); });
+    state.lastScan = Date.now();
+    await axSave(env, state);
+    report.note = "first_run_seeded";
+    return axJson(report);
+  }
+  if (!report.fresh) return axJson(report);
+
+  const models = await artTrModels(env);
+  if (!models.length) { report.errors.push("no_model"); return axJson(report); }
+  if (!(await axBudget(1))) { report.errors.push("daily_cap"); return axJson(report); }
+
+  /* همهٔ خبرهای فعلی به مدل می‌رود (نه فقط تازه‌ها) تا پوشش چندمنبعی درست سنجیده شود */
+  const listing = items.map(function (it, i) {
+    return "[" + i + "]" + (newSet[i] ? " NEW" : "") + " | " + it.source + " | " + (it.date || "") + "\n" +
+      it.title + "\n" + String(it.summary || "").slice(0, 220);
+  }).join("\n\n");
+
+  let tri = null;
+  for (const m of models.slice(0, 2)) {
+    tri = await axGeminiJson(env, m, axTriagePrompt(), listing);
+    if (tri.ok || !tri.busy) break;
+  }
+  if (!tri || !tri.ok) {
+    report.errors.push("triage_" + (tri ? tri.error : "none"));
+    return axJson(report); /* چیزی «دیده‌شده» ثبت نمی‌شود؛ اسکن بعدی دوباره امتحان می‌کند */
+  }
+
+  const groups = axCleanGroups(tri.data, items, newSet);
+  report.groups = groups.length;
+
+  /* خبرهایی که در هیچ گروه ایرانی نیستند همین حالا «دیده‌شده» می‌شوند */
+  const inGroup = {};
+  groups.forEach(function (g) { g.idx.forEach(function (i) { inGroup[i] = 1; }); });
+  const markSeen = function (i) { state.seen.push(axKey(items[i].link)); };
+  Object.keys(newSet).forEach(function (i) { if (!inGroup[i]) markSeen(parseInt(i, 10)); });
+
+  /* نقشهٔ لینک ← پیش‌نویس در انتظار، برای «منبع تازه به همان رویداد پیوست» */
+  const linkToPending = {};
+  for (const pid in state.pending) {
+    (state.pending[pid].links || []).forEach(function (l) { linkToPending[l] = pid; });
+  }
+
+  let drafted = 0;
+  for (const g of groups) {
+    const newIdx = g.idx.filter(function (i) { return newSet[i]; });
+
+    /* ۱) اگر رویداد قبلاً هشدار گرفته و هنوز در انتظار است: فقط به‌روزرسانی پوشش */
+    let pid = null;
+    for (const i of g.idx) { if (linkToPending[axKey(items[i].link)]) { pid = linkToPending[axKey(items[i].link)]; break; } }
+    if (pid) {
+      const p = state.pending[pid];
+      g.idx.forEach(function (i) {
+        const k = axKey(items[i].link);
+        if (p.links.indexOf(k) < 0) p.links.push(k);
+      });
+      const names = axSourcesOf(g, items);
+      names.forEach(function (n) { if (p.sources.indexOf(n) < 0) p.sources.push(n); });
+      if (g.independent) p.independent = true;
+      if (g.conflict) p.conflict = g.conflict;
+      newIdx.forEach(markSeen);
+      await axTg(env, "sendMessage", {
+        chat_id: env.TELEGRAM_CHAT_ID,
+        reply_to_message_id: p.msgId,
+        allow_sending_without_reply: true,
+        text: "📊 منبع تازه برای همین خبر — اکنون " + axFa(p.sources.length) + " رسانه: " + p.sources.join("، ") +
+          (p.independent ? "\nتأیید مستقل: دارد" : "") +
+          (p.conflict ? "\n⚠️ " + p.conflict : "") +
+          "\n(خط پوشش هنگام انتشار خودکار به‌روز می‌شود)",
+        disable_web_page_preview: true
+      });
+      report.updates++;
+      continue;
+    }
+
+    /* ۲) رویداد کم‌اهمیت: هشدار نمی‌آید */
+    if (g.importance < AX_MIN_IMPORTANCE) { newIdx.forEach(markSeen); continue; }
+
+    /* ۳) سقف این اسکن پر شد: دیده‌نشده می‌ماند تا اسکن بعدی */
+    if (drafted >= AX_MAX_DRAFTS) continue;
+    if (!(await axBudget(1))) { report.errors.push("daily_cap"); break; }
+
+    const names = axSourcesOf(g, items);
+    const lead = g.idx.slice().sort(function (a, b) {
+      return String(items[b].summary || "").length - String(items[a].summary || "").length;
+    })[0];
+    const combined = g.idx.map(function (i) {
+      return "[" + items[i].source + "] " + items[i].title + "\n" + (items[i].summary || "");
+    }).join("\n\n") +
+      "\n\nیادداشت میز بررسی (برای انتخاب زبان انتساب): منبع اصلی ادعا: " + g.origin +
+      "؛ تأیید مستقل: " + (g.independent ? "دارد" : "ندارد") + "." +
+      (g.conflict ? " تناقض: " + g.conflict : "");
+    const item = {
+      title: items[lead].title,
+      link: items[lead].link,
+      summary: "",
+      full: combined.slice(0, AI_TEXT_CAP),
+      date: items[lead].date,
+      source: names.join("، ")
+    };
+
+    let d = null;
+    for (const m of models.slice(0, 2)) {
+      d = await aiDraft(env, item, "khabar", m);
+      if (d.ok || !d.busy) break;
+    }
+    if (!d || !d.ok) { report.errors.push("draft_" + (d ? d.error : "none")); continue; }
+    if (d.skip) { newIdx.forEach(markSeen); continue; }
+
+    const id = axId();
+    const record = {
+      id: id, ts: Date.now(),
+      title: d.title, body: d.body,
+      city: g.city, importance: g.importance,
+      origin: g.origin, independent: g.independent, conflict: g.conflict,
+      sources: names,
+      links: g.idx.map(function (i) { return axKey(items[i].link); }),
+      urls: g.idx.map(function (i) { return items[i].source + " — " + items[i].link; }).slice(0, 5),
+      msgId: 0
+    };
+
+    const sent = await axTg(env, "sendMessage", axAlertPayload(env, record));
+    if (!sent || !sent.ok) { report.errors.push("telegram_" + (sent && sent.description)); continue; }
+    record.msgId = sent.result && sent.result.message_id;
+    state.pending[id] = record;
+    newIdx.forEach(markSeen);
+    drafted++;
+    report.alerts++;
+  }
+
+  state.lastScan = Date.now();
+  await axSave(env, state);
+  return axJson(report);
+}
+
+function axStars(n) {
+  let s = "";
+  for (let i = 1; i <= 5; i++) s += i <= n ? "★" : "☆";
+  return s;
+}
+
+function axAlertPayload(env, r) {
+  const cov = axCoverageLines(r.sources, r.origin, r.independent, r.conflict).join("\n");
+  let body = r.body;
+  if (body.length > 2600) body = body.slice(0, 2600) + " …";
+  const text = [
+    "🔴 خبر تازه · اهمیت " + axStars(r.importance) + (r.city ? " · 📍" + r.city : ""),
+    "",
+    r.title,
+    "",
+    body,
+    "",
+    cov,
+    "",
+    "لینک‌های منبع:",
+    r.urls.join("\n")
+  ].join("\n").slice(0, 4000);
+  return {
+    chat_id: env.TELEGRAM_CHAT_ID,
+    text: text,
+    disable_web_page_preview: true,
+    reply_markup: { inline_keyboard: axButtons(r.id) }
+  };
+}
+
+function axButtons(id) {
+  return [
+    [{ text: "✅ انتشار", callback_data: "ax:p:" + id }, { text: "✅ انتشار + پوش", callback_data: "ax:pp:" + id }],
+    [{ text: "✏️ ویرایش", url: SITE_ORIGIN + "/ax-edit?id=" + id }, { text: "❌ رد", callback_data: "ax:r:" + id }]
+  ];
+}
+
+/* ------------------------------------------------------ publish / reject */
+
+async function axPublish(env, state, id, opts) {
+  const p = state.pending[id];
+  if (!p) return { ok: false, error: "not_pending" };
+  const title = String(opts.title || p.title).trim().slice(0, 200);
+  let body = String(opts.body || p.body).trim();
+  /* خط پوشش و برچسب AI با آخرین شمارش منابع ساخته می‌شود */
+  body += "\n\n" + axCoverageLines(p.sources, p.origin, p.independent, p.conflict).join("\n") + "\n" + AX_AI_NOTE;
+
+  /* همان مسیر /admin/api — بدون مسیر موازی */
+  const req = new Request(SITE_ORIGIN + "/admin/api", {
+    method: "POST",
+    headers: { "content-type": "application/json", "authorization": "Bearer " + env.ADMIN_TOKEN },
+    body: JSON.stringify({ action: "create", title: title, body: body, push: opts.push === true })
+  });
+  const res = await handleAdminApi(req, env, null);
+  let j = {};
+  try { j = await res.json(); } catch (e) {}
+  if (!j.ok) return { ok: false, error: j.error || ("http_" + res.status) };
+
+  state.log.unshift({ id: j.id, city: p.city, title: title, importance: p.importance, ts: Date.now() });
+  delete state.pending[id];
+  await axSave(env, state);
+  return { ok: true, newsId: j.id, pushed: j.pushed, pushError: j.pushError, msgId: p.msgId };
+}
+
+async function axReject(env, state, id) {
+  const p = state.pending[id];
+  if (!p) return { ok: false, error: "not_pending" };
+  delete state.pending[id];
+  await axSave(env, state);
+  return { ok: true, msgId: p.msgId };
+}
+
+async function axMarkMessage(env, msgId, label, url) {
+  if (!msgId) return;
+  const btn = url ? { text: label, url: url } : { text: label, callback_data: "ax:x" };
+  await axTg(env, "editMessageReplyMarkup", {
+    chat_id: env.TELEGRAM_CHAT_ID, message_id: msgId,
+    reply_markup: { inline_keyboard: [[btn]] }
+  });
+}
+
+/* --------------------------------------------------- telegram webhook */
+
+async function axHandleTg(request, env) {
+  if (request.method !== "POST") return new Response("ok");
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return new Response("ok");
+  const secret = await axHookSecret(env);
+  const got = request.headers.get("x-telegram-bot-api-secret-token") || "";
+  if (!got || !timingSafeEqual(got, secret)) return new Response("forbidden", { status: 403 });
+
+  let u = null;
+  try { u = await request.json(); } catch (e) { return new Response("ok"); }
+  const cq = u && u.callback_query;
+  if (!cq) return new Response("ok");
+
+  const from = String(cq.from && cq.from.id);
+  const chat = String(cq.message && cq.message.chat && cq.message.chat.id);
+  const allowed = String(env.TELEGRAM_CHAT_ID);
+  const answer = function (text) {
+    return axTg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: text, show_alert: false });
+  };
+  if (from !== allowed || chat !== allowed) { await answer("⛔"); return new Response("ok"); }
+
+  const m = String(cq.data || "").match(/^ax:(p|pp|r):([a-z0-9]{4,20})$/);
+  if (!m) { await answer(""); return new Response("ok"); }
+
+  const state = await axLoad(env);
+  if (!state.pending[m[2]]) {
+    await answer("این پیش‌نویس دیگر در انتظار نیست (منتشر، رد یا منقضی شده).");
+    if (cq.message) await axMarkMessage(env, cq.message.message_id, "— بسته شد —");
+    return new Response("ok");
+  }
+
+  if (m[1] === "r") {
+    const r = await axReject(env, state, m[2]);
+    await answer(r.ok ? "رد شد" : "خطا");
+    await axMarkMessage(env, r.msgId || (cq.message && cq.message.message_id), "❌ رد شد");
+    return new Response("ok");
+  }
+
+  const r = await axPublish(env, state, m[2], { push: m[1] === "pp" });
+  if (!r.ok) { await answer("انتشار ناموفق: " + r.error); return new Response("ok"); }
+  await answer(m[1] === "pp" ? (r.pushed ? "منتشر شد و پوش رفت" : "منتشر شد؛ پوش ناموفق") : "منتشر شد");
+  await axMarkMessage(env, r.msgId || (cq.message && cq.message.message_id), "✅ منتشر شد — مشاهده", SITE_ORIGIN + "/news/" + r.newsId);
+  return new Response("ok");
+}
+
+/* ----------------------------------------------------- setup / status */
+
+async function axHandleSetup(request, env) {
+  if (!axAdminOk(request, env)) return axJson({ ok: false, error: "unauthorized" }, 401);
+  if (!env.TELEGRAM_BOT_TOKEN) return axJson({ ok: false, error: "TELEGRAM_BOT_TOKEN missing" }, 503);
+  const set = await axTg(env, "setWebhook", {
+    url: SITE_ORIGIN + "/api/ax/tg",
+    secret_token: await axHookSecret(env),
+    allowed_updates: ["callback_query"],
+    drop_pending_updates: true
+  });
+  const info = await axTg(env, "getWebhookInfo", {});
+  if (info && info.result) delete info.result.ip_address;
+  return axJson({ ok: !!(set && set.ok), setWebhook: set, info: info && info.result });
+}
+
+async function axHandleStatus(request, env) {
+  if (!axAdminOk(request, env)) return axJson({ ok: false, error: "unauthorized" }, 401);
+  const s = await axLoad(env);
+  const used = parseInt(await edgeGet("axGem:" + new Date().toISOString().slice(0, 10)) || "0", 10) || 0;
+  return axJson({
+    ok: true,
+    lastScan: s.lastScan ? new Date(s.lastScan).toISOString() : null,
+    seen: s.seen.length,
+    pending: Object.keys(s.pending).map(function (k) { return { id: k, title: s.pending[k].title, sources: s.pending[k].sources }; }),
+    published: s.log.slice(0, 10),
+    geminiToday: used + " / " + AX_DAILY_GEMINI_CAP,
+    scanKeySet: !!env.SCAN_KEY
+  });
+}
+
+/* --------------------------------------------------------- edit page */
+
+async function axHandleDraft(request, env) {
+  if (!axAdminOk(request, env)) return axJson({ ok: false, error: "unauthorized" }, 401);
+  const url = new URL(request.url);
+  const state = await axLoad(env);
+
+  if (request.method === "GET") {
+    const id = String(url.searchParams.get("id") || "");
+    const p = state.pending[id];
+    if (!p) return axJson({ ok: false, error: "not_pending" });
+    return axJson({
+      ok: true, id: id, title: p.title, body: p.body, city: p.city,
+      coverage: axCoverageLines(p.sources, p.origin, p.independent, p.conflict).join("\n"),
+      note: AX_AI_NOTE, urls: p.urls
+    });
+  }
+
+  let b = {};
+  try { b = await request.json(); } catch (e) {}
+  const id = String(b.id || "");
+  if (!state.pending[id]) return axJson({ ok: false, error: "not_pending" });
+
+  if (b.action === "reject") {
+    const r = await axReject(env, state, id);
+    if (r.ok) await axMarkMessage(env, r.msgId, "❌ رد شد");
+    return axJson(r);
+  }
+  if (b.action === "publish") {
+    const r = await axPublish(env, state, id, { title: b.title, body: b.body, push: b.push === true });
+    if (r.ok) await axMarkMessage(env, r.msgId, "✅ منتشر شد — مشاهده", SITE_ORIGIN + "/news/" + r.newsId);
+    return axJson(r);
+  }
+  return axJson({ ok: false, error: "unknown_action" }, 400);
+}
+
+function axEditPage() {
+  const html = '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'
+    + '<title>ویرایش پیش‌نویس AI</title><link rel="stylesheet" href="/assets/fonts/vazirmatn.css">'
+    + '<style>body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0;padding:16px;background:#f6f6f4;color:#111;max-width:760px;margin:auto}'
+    + 'h1{font-size:18px}input,textarea{width:100%;box-sizing:border-box;font:inherit;padding:10px;border:1px solid #ccc;border-radius:8px;margin:6px 0 12px}'
+    + 'textarea{min-height:320px;line-height:1.9}.box{background:#fff;border:1px solid #e3e3e3;border-radius:10px;padding:10px;font-size:13px;white-space:pre-wrap;margin-bottom:12px}'
+    + 'button{font:inherit;padding:10px 14px;border:0;border-radius:8px;margin:4px;cursor:pointer}.pub{background:#c0392b;color:#fff}.rej{background:#ddd}'
+    + '#msg{margin-top:10px;font-weight:700}a{color:#c0392b;word-break:break-all}</style></head><body>'
+    + '<h1>ویرایش پیش‌نویس AI</h1>'
+    + '<div id="login"><input id="tok" type="password" placeholder="توکن ادمین"><button class="pub" onclick="go()">ورود</button></div>'
+    + '<div id="app" style="display:none"><label>تیتر</label><input id="t"><label>متن</label><textarea id="b"></textarea>'
+    + '<div class="box" id="cov"></div><div class="box" id="src"></div>'
+    + '<label><input type="checkbox" id="push" style="width:auto"> ارسال پوش</label><br>'
+    + '<button class="pub" onclick="act(\'publish\')">انتشار</button><button class="rej" onclick="act(\'reject\')">رد</button><div id="msg"></div></div>'
+    + '<script>'
+    + 'var ID=new URLSearchParams(location.search).get("id")||"",TK="";'
+    + 'function $(i){return document.getElementById(i)}'
+    + 'function go(){TK=$("tok").value.trim();if(!TK)return;try{localStorage.setItem("ai_tok",TK)}catch(e){}load()}'
+    + 'function load(){fetch("/api/ax/draft?id="+encodeURIComponent(ID),{headers:{"x-admin-token":TK}}).then(function(r){return r.json()}).then(function(j){'
+    + 'if(!j.ok){$("login").style.display="block";$("app").style.display="none";$("msg").textContent="";alert(j.error==="not_pending"?"این پیش‌نویس دیگر در انتظار نیست.":"توکن نادرست است.");return}'
+    + '$("login").style.display="none";$("app").style.display="block";$("t").value=j.title;$("b").value=j.body;'
+    + '$("cov").textContent="این دو خط هنگام انتشار خودکار به انتهای متن اضافه می‌شوند:\\n\\n"+j.coverage+"\\n"+j.note;'
+    + '$("src").innerHTML="";(j.urls||[]).forEach(function(u){var m=u.match(/https?:\\/\\/\\S+/);var a=document.createElement("a");a.textContent=u;if(m){a.href=m[0];a.target="_blank";a.rel="noopener noreferrer"}$("src").appendChild(a);$("src").appendChild(document.createElement("br"))})})}'
+    + 'function act(a){if(a==="reject"&&!confirm("رد شود؟"))return;$("msg").textContent="…";'
+    + 'fetch("/api/ax/draft",{method:"POST",headers:{"content-type":"application/json","x-admin-token":TK},body:JSON.stringify({action:a,id:ID,title:$("t").value,body:$("b").value,push:$("push").checked})})'
+    + '.then(function(r){return r.json()}).then(function(j){if(!j.ok){$("msg").textContent="خطا: "+j.error;return}'
+    + 'if(a==="publish"){$("msg").innerHTML="";var l=document.createElement("a");l.href="/news/"+j.newsId;l.textContent="منتشر شد — مشاهده";$("msg").appendChild(l)}else{$("msg").textContent="رد شد."}'
+    + '$("app").querySelectorAll("button").forEach(function(x){x.disabled=true})})}'
+    + 'try{TK=localStorage.getItem("ai_tok")||""}catch(e){}if(TK)load();'
+    + '</script></body></html>';
+  return new Response(html, {
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }
+  });
 }
