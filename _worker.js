@@ -1,4 +1,4 @@
-/* build: v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v105 — ADMIN_TOKEN/SCAN_KEY با trim مقایسه می‌شوند (خط‌جدید ناخواسته هنگام کپی از Terminal) + /api/ax/diag بدون افشای مقدار | v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -242,6 +242,7 @@ async function route(request, env, ctx) {
     if (path === "/api/ax/tg")     return axHandleTg(request, env);
     if (path === "/api/ax/setup")  return axHandleSetup(request, env);
     if (path === "/api/ax/status") return axHandleStatus(request, env);
+    if (path === "/api/ax/diag")   return axHandleDiag(env);
     if (path === "/api/ax/draft")  return axHandleDraft(request, env);
     if (path === "/ax-edit" || path === "/ax-edit/") return axEditPage();
 
@@ -2133,7 +2134,7 @@ function getAdminToken(request, body) {
 }
 
 function checkAdmin(request, env, body) {
-  const secret = env && env.ADMIN_TOKEN;
+  const secret = env && env.ADMIN_TOKEN ? String(env.ADMIN_TOKEN).trim() : ""; /* v105: فاصله/خط‌جدیدِ ناخواسته در Secret */
   if (!secret) return { ok: false, code: 503, msg: "admin_disabled" };
   const token = getAdminToken(request, body);
   if (!token || !timingSafeEqual(token, secret)) return { ok: false, code: 401, msg: "unauthorized" };
@@ -4716,10 +4717,10 @@ const AI_FEEDS = [
 /* ---------------------------------------------------------------- helpers */
 
 function aiCheckAdmin(request, env) {
-  const want = env && env.ADMIN_TOKEN;
+  const want = env && env.ADMIN_TOKEN ? String(env.ADMIN_TOKEN).trim() : ""; /* v105 */
   if (!want) return false;
   const url = new URL(request.url);
-  const got = request.headers.get("x-admin-token") || url.searchParams.get("token") || "";
+  const got = (request.headers.get("x-admin-token") || url.searchParams.get("token") || "").trim();
   return got === want;
 }
 
@@ -5456,8 +5457,9 @@ function lbSlug(s) {
 
 function lbAdminOk(request, env) {
   const url = new URL(request.url);
-  const t = request.headers.get("x-admin-token") || url.searchParams.get("token") || "";
-  return Boolean(env && env.ADMIN_TOKEN) && t === env.ADMIN_TOKEN;
+  const t = (request.headers.get("x-admin-token") || url.searchParams.get("token") || "").trim();
+  const want = env && env.ADMIN_TOKEN ? String(env.ADMIN_TOKEN).trim() : ""; /* v105 */
+  return Boolean(want) && t === want;
 }
 
 function lbTehran(ts) {
@@ -6115,7 +6117,7 @@ function axId() {
 }
 
 function axAdminOk(request, env) {
-  const want = env && env.ADMIN_TOKEN;
+  const want = env && env.ADMIN_TOKEN ? String(env.ADMIN_TOKEN).trim() : ""; /* v105 */
   if (!want) return false;
   const url = new URL(request.url);
   const h = request.headers.get("authorization") || "";
@@ -6125,8 +6127,9 @@ function axAdminOk(request, env) {
 }
 
 function axScanOk(request, env) {
-  const k = request.headers.get("x-scan-key") || "";
-  if (env && env.SCAN_KEY && k && timingSafeEqual(k, env.SCAN_KEY)) return true;
+  const k = (request.headers.get("x-scan-key") || "").trim();
+  const want = env && env.SCAN_KEY ? String(env.SCAN_KEY).trim() : ""; /* v105 */
+  if (want && k && timingSafeEqual(k, want)) return true;
   return axAdminOk(request, env);
 }
 
@@ -6523,7 +6526,7 @@ async function axPublish(env, state, id, opts) {
   /* همان مسیر /admin/api — بدون مسیر موازی */
   const req = new Request(SITE_ORIGIN + "/admin/api", {
     method: "POST",
-    headers: { "content-type": "application/json", "authorization": "Bearer " + env.ADMIN_TOKEN },
+    headers: { "content-type": "application/json", "authorization": "Bearer " + String(env.ADMIN_TOKEN).trim() },
     body: JSON.stringify({ action: "create", title: title, body: body, push: opts.push === true })
   });
   const res = await handleAdminApi(req, env, null);
@@ -6701,4 +6704,13 @@ function axEditPage() {
   return new Response(html, {
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" }
   });
+}
+
+/* v105 — عیب‌یابی Secretها بدون افشای مقدار: فقط وجود، طول و وجود فاصله/خط‌جدید */
+function axHandleDiag(env) {
+  const info = function (v) {
+    if (typeof v !== "string" || !v) return { set: false };
+    return { set: true, length: v.length, trimmedLength: v.trim().length, hasWhitespace: /\s/.test(v) };
+  };
+  return axJson({ ADMIN_TOKEN: info(env && env.ADMIN_TOKEN), SCAN_KEY: info(env && env.SCAN_KEY) });
 }
