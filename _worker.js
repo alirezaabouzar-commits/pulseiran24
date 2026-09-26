@@ -1,4 +1,4 @@
-/* build: v106 — سئو: robots.txt مسیرهای فنی را می‌بندد + noindex روی /tgimg و /tgvid + پاک‌سازی خودکار خبرهای حذف‌شده‌ی تلگرام از article_index (رفع ۴۰۴ در sitemap) | v105 — ADMIN_TOKEN/SCAN_KEY با trim مقایسه می‌شوند (خط‌جدید ناخواسته هنگام کپی از Terminal) + /api/ax/diag بدون افشای مقدار | v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v107 — رفع نمایش &rlm; خام در تیتر: decodeNamed بعد از &amp; اجرا می‌شود + اصلاح متن‌های قدیمی KV هنگام نمایش | v106 — سئو: robots.txt مسیرهای فنی را می‌بندد + noindex روی /tgimg و /tgvid + پاک‌سازی خودکار خبرهای حذف‌شده‌ی تلگرام از article_index (رفع ۴۰۴ در sitemap) | v105 — ADMIN_TOKEN/SCAN_KEY با trim مقایسه می‌شوند (خط‌جدید ناخواسته هنگام کپی از Terminal) + /api/ax/diag بدون افشای مقدار | v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -628,9 +628,10 @@ function stripSelfSignature(text) {
 function cleanText(raw) {
   return decodeNamed(raw
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, ""))
+    .replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&nbsp;/g, " "))
+    /* v107: decodeNamed بعد از &amp; اجرا می‌شود — وگرنه &amp;rlm; به &rlm; خام تبدیل می‌شد */
     /* هر موجودیت عددی HTML دیگر (مثل &#33; برای «!») که تلگرام گاهی به‌جای کاراکتر خام می‌فرستد */
     .replace(/&#x([0-9a-fA-F]+);/g, (m, hex) => String.fromCodePoint(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (m, dec) => String.fromCodePoint(parseInt(dec, 10)))
@@ -1469,6 +1470,9 @@ async function handleArticle(url, env, ctx, lang) {
     await pruneMissingArticle(env, ctx, id);
     return notFoundArticlePage();
   }
+
+  /* v107: متن‌های قدیمیِ KV که &rlm; خام دارند، هنگام نمایش درست می‌شوند */
+  post = { ...post, text: decodeNamed(String(post.text || "")) };
 
   /* ترجمه‌ی تیتر و بندهای متن برای نسخه‌های انگلیسی و آلمانی (با کش KV) */
   let tr = null;
