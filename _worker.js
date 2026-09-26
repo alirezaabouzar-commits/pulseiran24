@@ -1,4 +1,4 @@
-/* build: v107 — رفع نمایش &rlm; خام در تیتر: decodeNamed بعد از &amp; اجرا می‌شود + اصلاح متن‌های قدیمی KV هنگام نمایش | v106 — سئو: robots.txt مسیرهای فنی را می‌بندد + noindex روی /tgimg و /tgvid + پاک‌سازی خودکار خبرهای حذف‌شده‌ی تلگرام از article_index (رفع ۴۰۴ در sitemap) | v105 — ADMIN_TOKEN/SCAN_KEY با trim مقایسه می‌شوند (خط‌جدید ناخواسته هنگام کپی از Terminal) + /api/ax/diag بدون افشای مقدار | v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v108 — سئو: /tgimg دوباره برای گوگل باز (عکس خبر در Discover/Top Stories/Images) + بدون noindex روی عکس سالم + خطای شبکه ۴۰۴ به‌جای 502 | v107 — رفع نمایش &rlm; خام در تیتر: decodeNamed بعد از &amp; اجرا می‌شود + اصلاح متن‌های قدیمی KV هنگام نمایش | v106 — سئو: robots.txt مسیرهای فنی را می‌بندد + noindex روی /tgimg و /tgvid + پاک‌سازی خودکار خبرهای حذف‌شده‌ی تلگرام از article_index (رفع ۴۰۴ در sitemap) | v105 — ADMIN_TOKEN/SCAN_KEY با trim مقایسه می‌شوند (خط‌جدید ناخواسته هنگام کپی از Terminal) + /api/ax/diag بدون افشای مقدار | v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -800,13 +800,13 @@ async function handleTgImg(url) {
       headers: {
         "Content-Type": safeCt,
         "X-Content-Type-Options": "nosniff",
-        "X-Robots-Tag": "noindex",   /* v106: این آدرس فایل است، نه صفحه */
+        /* v108: noindex برداشته شد — گوگل برای Discover و Google Images باید عکس خبر را ببیند */
         "Content-Disposition": "inline",
         "Cache-Control": "public, max-age=86400"
       }
     });
   } catch (e) {
-    return new Response("fetch failed", { status: 502 });
+    return tgMediaGone();   /* v108: 5xx سرعت خزیدن کل سایت را کم می‌کند */
   }
 }
 
@@ -2615,7 +2615,6 @@ function handleRobots(request, env) {
   const body = `User-agent: *
 Allow: /
 Disallow: /admin
-Disallow: /tgimg
 Disallow: /tgvid
 Disallow: /api/
 Disallow: /ai-newsroom
