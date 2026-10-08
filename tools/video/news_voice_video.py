@@ -67,8 +67,36 @@ def chunk_script(text, max_words=6):
     return [c for c in chunks if c]
 
 
-def time_chunks(text, chunks, char_times, t0, t1):
-    """(start, end) per chunk — from ElevenLabs alignment if present, else by character count."""
+def snap_to_pauses(chunks, out, pauses):
+    """Move chunk boundaries onto pauses in the voice: sentence ends first, then commas;
+    the remaining boundaries are spread by character count between the snapped ones."""
+    lens = [len(c) for c in chunks]
+    edges = [out[0][0]] + [s for s, _ in out[1:]] + [out[-1][1]]
+    fixed = {0, len(edges) - 1}
+
+    def respread():
+        f = sorted(fixed)
+        for a, b in zip(f, f[1:]):
+            tot = sum(lens[a:b]); t = edges[a]
+            for i in range(a + 1, b):
+                t += (edges[b] - edges[a]) * lens[i - 1] / tot; edges[i] = t
+
+    free = list(pauses)
+    for marks, tol in ((".!؟?", 2.5), ("،,", 1.2)):
+        for i in range(1, len(edges) - 1):
+            if i in fixed or chunks[i - 1][-1] not in marks:
+                continue
+            lo = max(edges[j] for j in fixed if j < i); hi = min(edges[j] for j in fixed if j > i)
+            cand = [p for p in free if lo < p < hi and abs(p - edges[i]) < tol]
+            if cand:
+                edges[i] = min(cand, key=lambda p: abs(p - edges[i])); fixed.add(i); free.remove(edges[i])
+        respread()
+    return list(zip(edges[:-1], edges[1:]))
+
+
+def time_chunks(text, chunks, char_times, t0, t1, pauses=None):
+    """(start, end) per chunk — from ElevenLabs alignment if present, else by character count
+    snapped to the pauses of the voice track."""
     spans, pos = [], 0
     for c in chunks:
         i = text.find(c.split()[0], pos)
@@ -81,8 +109,19 @@ def time_chunks(text, chunks, char_times, t0, t1):
         for c in chunks:
             d = (t1 - t0) * len(c) / total
             out.append((t, t + d)); t += d
+    if not char_times and pauses:
+        out = snap_to_pauses(chunks, out, pauses)
     # no gaps: each caption stays until the next one starts
     return [(s, out[k + 1][0] if k + 1 < len(out) else e) for k, (s, e) in enumerate(out)]
+
+
+def voice_pauses(path, offset):
+    """Mid-points (s) of pauses in a voice file, shifted by offset."""
+    log = subprocess.run(f"ffmpeg -i '{path}' -af silencedetect=n=-35dB:d=0.3 -f null -", shell=True,
+                         capture_output=True, text=True).stderr
+    st = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", log)]
+    en = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", log)]
+    return [offset + (a + b) / 2 for a, b in zip(st, en)]
 
 
 def caption_png(path, text, y_top=300):
@@ -145,7 +184,18 @@ def main():
         char_times = [(s + lead, e + lead) for s, e in char_times]
 
     chunks = chunk_script(text)
-    timing = time_chunks(text, chunks, char_times, lead, t1)
+    pauses = voice_pauses(voice, lead) if voice != "none" and not char_times else None
+    if pauses:   # speech starts after the leading silence
+        log = subprocess.run(f"ffmpeg -i '{voice}' -af silencedetect=n=-35dB:d=0.1 -f null -", shell=True,
+                             capture_output=True, text=True).stderr
+        m = re.search(r"silence_start: 0(?:\.0+)?\n.*?silence_end: ([\d.]+)", log, re.S)
+        speech0 = lead + (float(m.group(1)) if m else 0)
+        pauses = [p for p in pauses if p > speech0 + 0.5]
+    else:
+        speech0 = lead
+    timing = time_chunks(text, chunks, char_times, speech0, t1, pauses)
+    for k, (s, e) in enumerate(timing):
+        print(f"{s:6.2f}-{e:6.2f}  {chunks[k]}")
     for k, c in enumerate(chunks):
         caption_png(f"_cap{k}.png", c)
 
