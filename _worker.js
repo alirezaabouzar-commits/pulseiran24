@@ -1,4 +1,4 @@
-/* build: v108 — سئو: /tgimg دوباره برای گوگل باز (عکس خبر در Discover/Top Stories/Images) + بدون noindex روی عکس سالم + خطای شبکه ۴۰۴ به‌جای 502 | v107 — رفع نمایش &rlm; خام در تیتر: decodeNamed بعد از &amp; اجرا می‌شود + اصلاح متن‌های قدیمی KV هنگام نمایش | v106 — سئو: robots.txt مسیرهای فنی را می‌بندد + noindex روی /tgimg و /tgvid + پاک‌سازی خودکار خبرهای حذف‌شده‌ی تلگرام از article_index (رفع ۴۰۴ در sitemap) | v105 — ADMIN_TOKEN/SCAN_KEY با trim مقایسه می‌شوند (خط‌جدید ناخواسته هنگام کپی از Terminal) + /api/ax/diag بدون افشای مقدار | v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v109 — پوشش زنده: ویدیو و عکس در هر بند (پست تلگرام، یوتیوب/شورتز، فایل mp4/webm، عکس) + اسکیمای VideoObject برای یوتیوب | v108 — سئو: /tgimg دوباره برای گوگل باز (عکس خبر در Discover/Top Stories/Images) + بدون noindex روی عکس سالم + خطای شبکه ۴۰۴ به‌جای 502 | v107 — رفع نمایش &rlm; خام در تیتر: decodeNamed بعد از &amp; اجرا می‌شود + اصلاح متن‌های قدیمی KV هنگام نمایش | v106 — سئو: robots.txt مسیرهای فنی را می‌بندد + noindex روی /tgimg و /tgvid + پاک‌سازی خودکار خبرهای حذف‌شده‌ی تلگرام از article_index (رفع ۴۰۴ در sitemap) | v105 — ADMIN_TOKEN/SCAN_KEY با trim مقایسه می‌شوند (خط‌جدید ناخواسته هنگام کپی از Terminal) + /api/ax/diag بدون افشای مقدار | v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -5573,6 +5573,68 @@ function lbTehranDate(ts) {
   }
 }
 
+/* ---------- Medien (v109): YouTube, Telegram-Post, Video-/Bilddatei ------ */
+
+/* Wandelt einen eingefuegten Link in ein gepruefts Medienobjekt um.
+   null = kein Link, { bad: true } = Link nicht unterstuetzt. */
+function lbMedia(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  let u;
+  try { u = new URL(s, LB_ORIGIN); } catch (e) { return { bad: true }; }
+  if (u.protocol !== "https:") return { bad: true };
+  const host = u.hostname.replace(/^(www|m)\./, "");
+
+  let yt = null;
+  if (host === "youtu.be") yt = u.pathname.slice(1).split("/")[0];
+  else if (host === "youtube.com" || host === "youtube-nocookie.com") {
+    if (u.pathname === "/watch") yt = u.searchParams.get("v") || "";
+    else {
+      const m = u.pathname.match(/^\/(shorts|live|embed)\/([^/]+)/);
+      if (m) yt = m[2];
+    }
+  }
+  if (yt !== null) {
+    return /^[A-Za-z0-9_-]{11}$/.test(yt)
+      ? { type: "youtube", id: yt, vertical: u.pathname.indexOf("/shorts/") === 0 }
+      : { bad: true };
+  }
+
+  if (host === "t.me" || host === "telegram.me") {
+    const m = u.pathname.match(/^\/(?:s\/)?([A-Za-z0-9_]{4,32})\/(\d{1,10})\/?$/);
+    return m ? { type: "telegram", ch: m[1], post: m[2] } : { bad: true };
+  }
+
+  const ext = ((u.pathname.match(/\.([a-z0-9]{2,5})$/i) || [])[1] || "").toLowerCase();
+  const src = s.charAt(0) === "/" || u.origin === LB_ORIGIN ? u.pathname + u.search : u.href;
+  if (["mp4", "webm", "m4v"].indexOf(ext) >= 0) return { type: "video", src: src };
+  if (["jpg", "jpeg", "png", "webp", "gif"].indexOf(ext) >= 0) return { type: "image", src: src };
+  return { bad: true };
+}
+
+function lbMediaHtml(m) {
+  if (!m || !m.type) return "";
+  if (m.type === "youtube") {
+    return '<div class="lb-media lb-yt' + (m.vertical ? " lb-vert" : "") + '">' +
+      '<iframe src="https://www.youtube-nocookie.com/embed/' + lbEsc(m.id) + '" title="ویدیو" loading="lazy" ' +
+      'allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen ' +
+      'referrerpolicy="strict-origin-when-cross-origin"></iframe></div>';
+  }
+  if (m.type === "telegram") {
+    const p = lbEsc(m.ch) + "/" + lbEsc(m.post);
+    return '<div class="lb-media lb-tg"><iframe src="https://t.me/' + p + '?embed=1&amp;dark=1" ' +
+      'title="ویدیو در تلگرام" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>' +
+      '<a class="lb-tg-a" href="https://t.me/' + p + '" target="_blank" rel="noopener noreferrer">مشاهده در تلگرام</a></div>';
+  }
+  if (m.type === "video") {
+    return '<div class="lb-media"><video src="' + lbEsc(m.src) + '" controls preload="metadata" playsinline></video></div>';
+  }
+  if (m.type === "image") {
+    return '<div class="lb-media"><img src="' + lbEsc(m.src) + '" alt="" loading="lazy" decoding="async"></div>';
+  }
+  return "";
+}
+
 /* ---------- Speicher ---------------------------------------------------- */
 
 async function lbEdgeGet(key) {
@@ -5692,6 +5754,8 @@ async function lbApi(request, env) {
   if (action === "entry") {
     const text = String(body.text || "").trim();
     if (!text) return lbJson({ ok: false, error: "text missing" }, 400);
+    const media = lbMedia(body.media); /* v109 */
+    if (media && media.bad) return lbJson({ ok: false, error: "media link not supported" }, 400);
     const entry = {
       id: "e" + now,
       ts: now,
@@ -5700,6 +5764,7 @@ async function lbApi(request, env) {
         ? String(body.level) : "normal",
       source: String(body.source || "").trim()
     };
+    if (media) entry.media = media;
     blog.entries = [entry].concat(blog.entries || []).slice(0, LB_MAX_ENTRIES);
     blog.updated = now;
     await lbWrite(env, "live:" + id, blog);
@@ -5790,6 +5855,16 @@ box-shadow:0 6px 20px rgba(0,0,0,.45)}
 border-radius:12px;padding:14px;margin-bottom:12px;text-decoration:none}
 .lb-list h3{margin:0 0 6px;font-size:16.5px}
 :target .lb-item,.lb-item:target{outline:2px solid var(--lb-red)}
+.lb-media{margin:10px 0 2px;border-radius:10px;overflow:hidden;background:#000}
+.lb-media iframe,.lb-media video,.lb-media img{display:block;width:100%;border:0}
+.lb-media video{max-height:75vh;background:#000}
+.lb-media img{height:auto}
+.lb-yt{aspect-ratio:16/9}
+.lb-yt iframe{height:100%}
+.lb-yt.lb-vert{aspect-ratio:9/16;max-width:340px;margin-inline:auto}
+.lb-tg{background:transparent;border-radius:0}
+.lb-tg iframe{height:480px;border-radius:10px}
+.lb-tg-a{display:inline-block;margin-top:6px;font-size:12.5px;color:var(--lb-muted)}
 `;
 
 /* ---------- Client-Skript ---------------------------------------------- */
@@ -5816,12 +5891,36 @@ function lbClientScript(id, lastTs) {
   }
   var TAGS={breaking:'فوری',confirmed:'تأییدشده',unconfirmed:'تأییدنشده',denied:'رد شد'};
   function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+  function at(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+  function med(m){ /* v109: muss lbMediaHtml im Worker entsprechen */
+    if(!m||!m.type) return '';
+    if(m.type==='youtube') return '<div class="lb-media lb-yt'+(m.vertical?' lb-vert':'')+'">'+
+      '<iframe src="https://www.youtube-nocookie.com/embed/'+at(m.id)+'" title="ویدیو" loading="lazy" '+
+      'allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen '+
+      'referrerpolicy="strict-origin-when-cross-origin"></iframe></div>';
+    if(m.type==='telegram'){ var p=at(m.ch)+'/'+at(m.post);
+      return '<div class="lb-media lb-tg"><iframe src="https://t.me/'+p+'?embed=1&amp;dark=1" '+
+      'title="ویدیو در تلگرام" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>'+
+      '<a class="lb-tg-a" href="https://t.me/'+p+'" target="_blank" rel="noopener noreferrer">مشاهده در تلگرام</a></div>'; }
+    if(m.type==='video') return '<div class="lb-media"><video src="'+at(m.src)+'" controls preload="metadata" playsinline></video></div>';
+    if(m.type==='image') return '<div class="lb-media"><img src="'+at(m.src)+'" alt="" loading="lazy" decoding="async"></div>';
+    return '';
+  }
+  /* Telegram-Einbettung meldet ihre Hoehe per postMessage */
+  window.addEventListener('message',function(ev){
+    if(ev.origin!=='https://t.me') return;
+    var d=ev.data; try{ if(typeof d==='string') d=JSON.parse(d); }catch(x){ return; }
+    if(!d||d.event!=='resize'||!d.height) return;
+    [].forEach.call(document.querySelectorAll('.lb-tg iframe'),function(f){
+      if(f.contentWindow===ev.source) f.style.height=parseInt(d.height,10)+'px';
+    });
+  });
   function node(e){
     var d=document.createElement('article');
     d.className='lb-item lb-new '+e.level; d.id=e.id;
     var tag = TAGS[e.level] ? '<span class="lb-tag '+e.level+'">'+TAGS[e.level]+'</span>' : '';
     d.innerHTML='<div class="lb-head"><span class="lb-time" data-ts="'+e.ts+'"></span>'+tag+'</div>'+
-      '<p class="lb-text">'+esc(e.text)+'</p>'+
+      '<p class="lb-text">'+esc(e.text)+'</p>'+med(e.media)+
       (e.source?'<p class="lb-src">📌 منبع: '+esc(e.source)+'</p>':'')+
       '<button class="lb-link" data-anchor="'+e.id+'">کپی لینک این بند</button>';
     return d;
@@ -5877,7 +5976,7 @@ function lbEntryHtml(e) {
   return '<article class="lb-item ' + lbEsc(e.level) + '" id="' + lbEsc(e.id) + '">' +
     '<div class="lb-head"><span class="lb-time" data-ts="' + Number(e.ts) + '">' +
       lbEsc(lbTehran(e.ts)) + "</span>" + tag + "</div>" +
-    '<p class="lb-text">' + lbEsc(e.text) + "</p>" +
+    '<p class="lb-text">' + lbEsc(e.text) + "</p>" + lbMediaHtml(e.media) +
     (e.source ? '<p class="lb-src">📌 منبع: ' + lbEsc(e.source) + "</p>" : "") +
     '<button class="lb-link" data-anchor="' + lbEsc(e.id) + '">کپی لینک این بند</button>' +
     "</article>";
@@ -5942,13 +6041,29 @@ async function lbPage(request, env, url) {
     coverageStartTime: new Date(blog.created).toISOString(),
     inLanguage: "fa",
     publisher: { "@type": "Organization", name: "Pulse Iran 24", url: LB_ORIGIN },
-    liveBlogUpdate: entries.slice(0, 25).map(e => ({
-      "@type": "BlogPosting",
-      headline: String(e.text).slice(0, 110),
-      articleBody: e.text,
-      datePublished: new Date(e.ts).toISOString(),
-      url: LB_ORIGIN + "/live/" + blog.id + "#" + e.id
-    }))
+    liveBlogUpdate: entries.slice(0, 25).map(e => {
+      const u = {
+        "@type": "BlogPosting",
+        headline: String(e.text).slice(0, 110),
+        articleBody: e.text,
+        datePublished: new Date(e.ts).toISOString(),
+        url: LB_ORIGIN + "/live/" + blog.id + "#" + e.id
+      };
+      const m = e.media; /* v109 */
+      if (m && m.type === "image") {
+        u.image = m.src.charAt(0) === "/" ? LB_ORIGIN + m.src : m.src;
+      } else if (m && m.type === "youtube") {
+        u.video = {
+          "@type": "VideoObject",
+          name: String(e.text).slice(0, 110),
+          description: String(e.text).slice(0, 300),
+          thumbnailUrl: "https://i.ytimg.com/vi/" + m.id + "/hqdefault.jpg",
+          uploadDate: new Date(e.ts).toISOString(),
+          embedUrl: "https://www.youtube-nocookie.com/embed/" + m.id
+        };
+      }
+      return u;
+    })
   };
   if (!open && blog.closed) ld.coverageEndTime = new Date(blog.closed).toISOString();
 
@@ -6046,6 +6161,9 @@ button.g{background:#2a2f38}
       </select></div>
     <div><label>منبع</label><input id="src" placeholder="رویترز"></div>
   </div>
+  <label>لینک ویدیو یا عکس (اختیاری)</label>
+  <input id="med" dir="ltr" placeholder="https://t.me/pulseiran24/1234">
+  <div class="lb-meta" style="margin-top:5px">پشتیبانی: پست تلگرام (t.me/کانال/شماره)، یوتیوب و شورتز، فایل mp4/webm یا عکس jpg/png/webp — مثلاً /assets/video/paris.mp4 از گیت‌هاب</div>
   <label style="display:flex;gap:8px;align-items:center;margin-top:12px">
     <input type="checkbox" id="push" style="width:auto"> ارسال اعلان پوش (فقط برای خبر فوری واقعی)
   </label>
@@ -6088,7 +6206,7 @@ function loadRecent(){
        var row=document.createElement('div');
        row.style.cssText='border-bottom:1px solid var(--lb-line);padding:8px 0';
        row.innerHTML='<div style="font-size:14px;color:var(--lb-ink)"></div>';
-       row.firstChild.textContent=e.text.slice(0,120);
+       row.firstChild.textContent=(e.media?(e.media.type==='image'?'🖼 ':'🎬 '):'')+e.text.slice(0,120);
        var del=document.createElement('button');
        del.className='lb-link'; del.textContent='حذف';
        del.onclick=function(){ if(!confirm('حذف این بند؟'))return;
@@ -6118,10 +6236,11 @@ $('add').onclick=function(){
   var id=$('sel').value, t=$('txt').value.trim();
   if(!id){say('m2','اول یک پوشش انتخاب کنید');return}
   if(!t){say('m2','متن بند خالی است');return}
-  post({action:'entry',id:id,text:t,level:$('lvl').value,source:$('src').value.trim(),push:$('push').checked})
+  post({action:'entry',id:id,text:t,level:$('lvl').value,source:$('src').value.trim(),media:$('med').value.trim(),push:$('push').checked})
   .then(function(d){
-    if(d.ok){say('m2','ثبت شد'+(d.pushed?' + پوش ارسال شد':''),1);
-      $('txt').value='';$('push').checked=false;$('lvl').value='normal';loadRecent()}
+    if(d.ok){say('m2','ثبت شد'+(d.entry&&d.entry.media?' (با رسانه)':'')+(d.pushed?' + پوش ارسال شد':''),1);
+      $('txt').value='';$('med').value='';$('push').checked=false;$('lvl').value='normal';loadRecent()}
+    else if(d.error==='media link not supported') say('m2','این لینک پشتیبانی نمی‌شود — پست تلگرام، یوتیوب، یا فایل mp4/عکس بدهید');
     else say('m2','خطا: '+(d.error||''));
   });
 };
