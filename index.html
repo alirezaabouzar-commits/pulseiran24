@@ -1138,6 +1138,7 @@
     <span class="live-dot" id="liveDot">● LIVE</span>
   </div>
   <div class="live-tabs" id="liveTabs">
+    <button class="live-tab" data-ch="me" onclick="playChannel('me')">پالس ایران ۲۴</button>
     <button class="live-tab active" data-ch="intl" onclick="playChannel('intl')">ایران اینترنشنال</button>
     <button class="live-tab" data-ch="voa" onclick="playChannel('voa')">صدای آمریکا</button>
     <button class="live-tab" data-ch="aljazeera" onclick="playChannel('aljazeera')">الجزیره</button>
@@ -2271,6 +2272,7 @@ function applyUI() {
   if (fsb) fsb.textContent = L.liveBadge;
   /* نام کانال‌های پخش زنده */
   const TABN = {
+    me: { fa:"پالس ایران ۲۴", en:"Pulse Iran 24", de:"Pulse Iran 24" },
     intl: { fa:"ایران اینترنشنال", en:"Iran International", de:"Iran International" },
     voa: { fa:"صدای آمریکا", en:"VOA", de:"VOA" },
     aljazeera: { fa:"الجزیره", en:"Al Jazeera", de:"Al Jazeera" }
@@ -2602,7 +2604,7 @@ async function checkLive() {
     return;
   }
   const meId = await fetchLive("me");
-  if (meId) { setLive("me:" + meId, "https://www.youtube.com/embed/" + meId + params, "me"); return; }
+  if (meId) { setLive("me:" + meId, "https://www.youtube.com/embed/" + meId + params, "me"); setActiveTab("me"); return; }
   const intlId = await fetchLive("intl");
   if (intlId) { setLive("intl:" + intlId, "https://www.youtube.com/embed/" + intlId + params, "intl"); setActiveTab("intl"); return; }
   showFallback();
