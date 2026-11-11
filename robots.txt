@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://pulseiran24.com/sitemap.xml
