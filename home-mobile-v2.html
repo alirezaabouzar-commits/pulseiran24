@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>پالس ایران ۲۴</title>
+<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">
+<style>
+:root{--bg:#fbf8ff;--surface:#fff;--ink:#1a1b22;--muted:#5c403c;--red:#b70011;--red2:#dc2626;--line:#e6bdb8;--soft:#eeedf7;--radius:14px}
+html.night{--bg:#121218;--surface:#1c1c24;--ink:#f1effa;--muted:#b9aaa6;--line:#3a2c2a;--soft:#25252f}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:Vazirmatn,Tahoma,sans-serif;padding-bottom:84px;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;height:60px;padding:0 16px}
+.brand{display:flex;align-items:center;gap:8px;min-width:0;text-decoration:none}
+.brand img{height:32px;width:auto}
+.brand b{font-size:17px;white-space:nowrap}
+.actions{display:flex;gap:4px}
+.ib{width:42px;height:42px;border:0;border-radius:50%;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.ib:active{transform:scale(.94);background:var(--soft)}
+.ib.sm{width:34px;height:34px}
+.ib.on{color:var(--red)}
+.ib.on svg{fill:currentColor}
+svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.search{display:none;padding:0 16px 10px;max-width:720px;margin:0 auto}
+.search.open{display:block}
+.search input{width:100%;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:15px}
+.ticker{display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--bg);padding:8px 12px;overflow:hidden;font-size:14px}
+.ticker[hidden]{display:none}
+.tl{flex:0 0 auto;background:var(--red);color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700}
+.tt{white-space:nowrap;overflow:hidden;min-width:0;flex:1}
+.tt span{display:inline-block;padding-inline-start:100%;animation:scroll 40s linear infinite}
+@keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+main{padding:12px 16px 24px;max-width:720px;margin:0 auto}
+h2.sec{font-size:18px;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+h2.sec::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--red)}
+.stories{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 8px;scrollbar-width:none}
+.stories::-webkit-scrollbar{display:none}
+.story{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;width:72px;font-size:12px;text-align:center}
+.ring{width:66px;height:66px;border-radius:50%;padding:3px;background:linear-gradient(135deg,var(--red),var(--red2) 60%,#f59e0b)}
+.ring span{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;background:var(--surface);color:var(--red);font-weight:800;font-size:18px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;border:0;border-radius:999px;padding:7px 14px;background:var(--soft);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
+.chip.on{background:var(--red);color:#fff;font-weight:700}
+.hero{position:relative;display:block;height:230px;border-radius:var(--radius);overflow:hidden;background:linear-gradient(135deg,#7a000b,var(--red) 55%,var(--red2));color:#fff;text-decoration:none;margin-top:6px}
+.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hshade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.82),rgba(0,0,0,.05))}
+.htext{position:absolute;inset-inline:0;bottom:0;padding:16px}
+.htext h3{margin:8px 0 6px;font-size:20px;line-height:1.7}
+.hdate{font-size:12px;opacity:.85}
+.top{list-style:none;margin:0;padding:0;background:var(--surface);border-radius:var(--radius)}
+.top li{display:flex;gap:12px;align-items:flex-start;padding:12px;border-bottom:1px solid var(--soft)}
+.top li:last-child{border-bottom:0}
+.num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--soft);display:grid;place-items:center;font-weight:800;color:var(--red)}
+.top a{text-decoration:none;font-weight:700;line-height:1.7;font-size:15px;overflow-wrap:anywhere}
+.list{display:flex;flex-direction:column;gap:12px}
+.card{display:flex;gap:12px;background:var(--surface);border-radius:var(--radius);padding:12px;box-shadow:0 1px 6px rgba(0,0,0,.05);animation:in .4s ease both}
+.thumb{width:92px;height:92px;flex:0 0 92px;border-radius:10px;object-fit:cover;background:var(--soft)}
+.cbody{min-width:0;flex:1;display:flex;flex-direction:column;gap:6px}
+.meta{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.tag{background:var(--soft);color:var(--red);padding:2px 8px;border-radius:6px;font-weight:700}
+.tag.light{background:rgba(255,255,255,.2);color:#fff}
+.card h3{margin:0;font-size:16px;line-height:1.7;font-weight:700;overflow-wrap:anywhere}
+.card h3 a{text-decoration:none}
+.card p{margin:0;font-size:14px;line-height:1.8;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.acts{display:flex;align-items:center;gap:6px;margin-top:auto}
+.more{color:#fff;background:var(--red);text-decoration:none;font-size:13px;font-weight:700;padding:6px 12px;border-radius:8px;margin-inline-end:auto}
+.loadmore{width:100%;margin-top:14px;padding:11px;border-radius:12px;border:0;background:var(--soft);color:var(--ink);font:inherit;font-weight:700;cursor:pointer}
+.tabs{position:fixed;bottom:0;inset-inline:0;height:68px;display:flex;justify-content:space-around;align-items:center;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:30}
+.tabs a,.tabs button{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:inherit;font-size:12px;color:var(--muted);text-decoration:none;background:none;border:0;cursor:pointer}
+.tabs .on{color:var(--red);font-weight:700}
+.toast{position:fixed;bottom:84px;left:50%;transform:translate(-50%,16px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;z-index:40}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.state{text-align:center;color:var(--muted);padding:32px 8px;font-size:15px}
+.retry{margin-top:10px;background:var(--red);color:#fff;border:0;border-radius:10px;padding:8px 16px;font:inherit;cursor:pointer}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <a class="brand" href="/"><img src="/logo.png" alt="" onerror="this.remove()"><b>پالس ایران ۲۴</b></a>
+    <div class="actions">
+      <button class="ib" id="btnTheme" type="button" aria-label="حالت روز یا شب"></button>
+      <button class="ib" id="btnSearch" type="button" aria-label="جستجو"></button>
+    </div>
+  </div>
+  <div class="search" id="searchBox"><input id="q" type="search" placeholder="جستجو در عنوان و متن خبرها" autocomplete="off"></div>
+</header>
+
+<div class="ticker" id="ticker" hidden><span class="tl">آخرین خبر</span><div class="tt"><span id="tickerTxt"></span></div></div>
+
+<main>
+  <h2 class="sec">دسترسی سریع</h2>
+  <nav class="stories" aria-label="دسترسی سریع">
+    <a class="story" href="/live"><div class="ring"><span>●</span></div>پوشش زنده</a>
+    <a class="story" href="/tahlil"><div class="ring"><span>🎧</span></div>تحلیل صوتی</a>
+    <a class="story" href="/jam2026"><div class="ring"><span>⚽</span></div>ورزش</a>
+    <a class="story" href="/jarayed.html"><div class="ring"><span>📰</span></div>مطبوعات</a>
+    <a class="story" href="/rooydad.html"><div class="ring"><span>📷</span></div>رویدادها</a>
+    <a class="story" href="/card.html"><div class="ring"><span>▣</span></div>ساخت کارت</a>
+  </nav>
+
+  <div class="chips" id="chips" role="group" aria-label="دسته‌بندی"></div>
+  <div id="hero"></div>
+
+  <h2 class="sec" id="trend">آخرین‌ها</h2>
+  <ol class="top" id="top"></ol>
+
+  <h2 class="sec">تازه‌ترین نبض خبر</h2>
+  <div class="list" id="list"></div>
+  <button class="loadmore" id="more" type="button" hidden>نمایش خبرهای بیشتر</button>
+  <div class="state" id="state" hidden></div>
+</main>
+
+<nav class="tabs" aria-label="ناوبری اصلی">
+  <button id="tabHome" class="on" type="button"></button>
+  <button id="tabTrend" type="button"></button>
+  <a href="https://www.youtube.com/@pulseiran24" target="_blank" rel="noopener noreferrer"></a>
+  <button id="tabCats" type="button"></button>
+  <button id="tabBm" type="button"></button>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const BM_KEY = 'pi24_bm', TH_KEY = 'pi24_theme', PAGE = 10;
+
+  const ICON = {
+    sun:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+    moon:'<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
+    search:'<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+    share:'<svg viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/></svg>',
+    bm:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+    home:'<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+    trend:'<svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>',
+    video:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>',
+    grid:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>'
+  };
+
+  let ITEMS = [], CAT = 'all', Q = '', ONLY_BM = false, SHOWN = PAGE;
+  let BM = new Set();
+  try { BM = new Set(JSON.parse(localStorage.getItem(BM_KEY) || '[]')); } catch (e) {}
+  const saveBM = () => { try { localStorage.setItem(BM_KEY, JSON.stringify([...BM])); } catch (e) {} };
+
+  // Icons
+  $('#btnSearch').innerHTML = ICON.search;
+  $('#tabHome').innerHTML = ICON.home + '<span>خانه</span>';
+  $('#tabTrend').innerHTML = ICON.trend + '<span>آخرین‌ها</span>';
+  document.querySelector('.tabs a').innerHTML = ICON.video + '<span>ویدیو</span>';
+  $('#tabCats').innerHTML = ICON.grid + '<span>دسته‌ها</span>';
+  $('#tabBm').innerHTML = ICON.bm + '<span>نشان‌ها</span>';
+
+  // Theme
+  try { if (localStorage.getItem(TH_KEY) === 'night') document.documentElement.classList.add('night'); } catch (e) {}
+  const syncTheme = () => { $('#btnTheme').innerHTML = document.documentElement.classList.contains('night') ? ICON.sun : ICON.moon; };
+  syncTheme();
+  $('#btnTheme').onclick = () => {
+    const n = document.documentElement.classList.toggle('night');
+    try { localStorage.setItem(TH_KEY, n ? 'night' : 'day'); } catch (e) {}
+    syncTheme();
+  };
+
+  // Search
+  const sb = $('#searchBox'), qi = $('#q');
+  const toggleSearch = () => { sb.classList.toggle('open'); if (sb.classList.contains('open')) qi.focus(); };
+  $('#btnSearch').onclick = toggleSearch;
+  qi.addEventListener('input', () => { Q = qi.value.trim(); SHOWN = PAGE; render(); });
+
+  // Bottom tabs
+  $('#tabHome').onclick = () => { CAT = 'all'; ONLY_BM = false; Q = ''; qi.value = ''; SHOWN = PAGE; buildChips(); setTabs('tabHome'); render(); scrollTo({ top: 0, behavior: 'smooth' }); };
+  $('#tabTrend').onclick = () => { setTabs('tabTrend'); $('#trend').scrollIntoView({ behavior: 'smooth' }); };
+  $('#tabCats').onclick = () => { setTabs('tabCats'); $('#chips').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+  $('#tabBm').onclick = () => { ONLY_BM = !ONLY_BM; setTabs(ONLY_BM ? 'tabBm' : 'tabHome'); render(); };
+  function setTabs(id) {
+    ['tabHome', 'tabTrend', 'tabCats', 'tabBm'].forEach(t => $('#' + t).classList.toggle('on', t === id));
+  }
+
+  function norm(it) {
+    const raw = String(it.text || '').replace(/<[^>]+>/g, '').trim();
+    let title = String(it.title || '').trim();
+    let summary = String(it.summary || '').trim();
+    if (!title && raw) {
+      const nl = raw.indexOf('\n');
+      title = (nl > 0 ? raw.slice(0, nl) : raw).trim();
+      summary = raw.slice(title.length).trim();
+    }
+    if (title.length > 140) title = title.slice(0, 140) + '…';
+    let url = '';
+    if (it.id) url = '/news/' + encodeURIComponent(it.id);
+    else { const m = String(it.link || '').match(/(\d+)\s*$/); if (m) url = '/news/' + m[1]; }
+    return {
+      title, url,
+      summary: summary.slice(0, 220),
+      image: it.photo || it.image || it.img || '',
+      category: it.category || '',
+      date: it.published || it.date || it.created || ''
+    };
+  }
+
+  function fmtDate(d) {
+    if (!d) return '';
+    const t = Date.parse(d);
+    if (isNaN(t)) return esc(d);
+    try { return new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(t)); }
+    catch (e) { return esc(d); }
+  }
+
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  async function share(it) {
+    const url = new URL(it.url, location.origin).href;
+    if (navigator.share) { try { await navigator.share({ title: it.title, url }); } catch (e) {} return; }
+    try { await navigator.clipboard.writeText(url); toast('پیوند خبر کپی شد'); }
+    catch (e) { toast('کپی انجام نشد'); }
+  }
+
+  function setState(msg, retry) {
+    const s = $('#state');
+    s.innerHTML = '';
+    s.hidden = !msg && !retry;
+    if (msg) s.textContent = msg;
+    if (retry) {
+      const b = document.createElement('button');
+      b.className = 'retry'; b.type = 'button'; b.textContent = 'تلاش دوباره';
+      b.onclick = () => load(false);
+      s.appendChild(b);
+    }
+  }
+
+  function card(it) {
+    const saved = BM.has(it.url);
+    return `<article class="card">
+      ${it.image ? `<img class="thumb" src="${esc(it.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+      <div class="cbody">
+        <div class="meta">${it.category ? `<span class="tag">${esc(it.category)}</span>` : ''}<span>${fmtDate(it.date)}</span></div>
+        <h3><a href="${esc(it.url)}">${esc(it.title)}</a></h3>
+        ${it.summary ? `<p>${esc(it.summary)}</p>` : ''}
+        <div class="acts">
+          <a class="more" href="${esc(it.url)}">ادامه مطلب</a>
+          <button class="ib sm" type="button" data-share="${esc(it.url)}" aria-label="اشتراک‌گذاری">${ICON.share}</button>
+          <button class="ib sm ${saved ? 'on' : ''}" type="button" data-bm="${esc(it.url)}" aria-pressed="${saved}" aria-label="نشان کردن">${ICON.bm}</button>
+        </div>
+      </div>
+    </article>`;
+  }
+
+  function hero(it) {
+    return `<a class="hero" href="${esc(it.url)}">
+      ${it.image ? `<img src="${esc(it.image)}" alt="" onerror="this.remove()">` : ''}
+      <div class="hshade"></div>
+      <div class="htext">
+        ${it.category ? `<span class="tag light">${esc(it.category)}</span>` : ''}
+        <h3>${esc(it.title)}</h3>
+        <span class="hdate">${fmtDate(it.date)}</span>
+      </div>
+    </a>`;
+  }
+
+  function filtered() {
+    return ITEMS.filter(x =>
+      (CAT === 'all' || x.category === CAT) &&
+      (!Q || x.title.includes(Q) || x.summary.includes(Q)) &&
+      (!ONLY_BM || BM.has(x.url))
+    );
+  }
+
+  function render() {
+    const f = filtered();
+    const plain = CAT === 'all' && !Q && !ONLY_BM;
+    const heroItem = plain ? f[0] : null;
+    $('#hero').innerHTML = heroItem ? hero(heroItem) : '';
+    const topItems = plain ? f.slice(1, 6) : [];
+    $('#top').innerHTML = topItems.map((it, i) =>
+      `<li><span class="num">${i + 1}</span><a href="${esc(it.url)}">${esc(it.title)}</a></li>`).join('');
+    $('#top').parentElement.querySelector('#trend').hidden = !topItems.length;
+    $('#top').hidden = !topItems.length;
+    const rest = plain ? f.slice(6) : f;
+    $('#list').innerHTML = rest.slice(0, SHOWN).map(card).join('');
+    $('#more').hidden = rest.length <= SHOWN;
+    if (!f.length) setState(ONLY_BM ? 'هنوز خبری را نشان نکرده‌اید.' : 'موردی پیدا نشد.');
+    else setState('');
+  }
+
+  function buildChips() {
+    const cats = [...new Set(ITEMS.map(x => x.category).filter(Boolean))];
+    const el = $('#chips');
+    el.style.display = cats.length ? '' : 'none';
+    el.innerHTML = ['all', ...cats].map(c =>
+      `<button class="chip ${c === CAT ? 'on' : ''}" type="button" data-cat="${esc(c)}">${c === 'all' ? 'همه' : esc(c)}</button>`).join('');
+  }
+
+  $('#chips').addEventListener('click', e => {
+    const b = e.target.closest('[data-cat]');
+    if (!b) return;
+    CAT = b.dataset.cat; SHOWN = PAGE;
+    buildChips(); render();
+  });
+
+  $('#more').onclick = () => { SHOWN += PAGE; render(); };
+
+  $('main').addEventListener('click', e => {
+    const s = e.target.closest('[data-share]');
+    if (s) { const it = ITEMS.find(x => x.url === s.dataset.share); if (it) share(it); return; }
+    const b = e.target.closest('[data-bm]');
+    if (b) {
+      const u = b.dataset.bm;
+      if (BM.has(u)) { BM.delete(u); toast('از نشان‌ها حذف شد'); }
+      else { BM.add(u); toast('به نشان‌ها اضافه شد'); }
+      saveBM(); render();
+    }
+  });
+
+  // Data comes only from the site's own feed. Nothing is invented here.
+  async function load(silent) {
+    if (!silent) setState('در حال بارگذاری خبرها…');
+    try {
+      const r = await fetch('/api/news', { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      const arr = Array.isArray(j) ? j : (j.posts || j.items || j.news || []);
+      ITEMS = arr.map(norm).filter(x => x.title && x.url);
+      if (!ITEMS.length) {
+        $('#hero').innerHTML = ''; $('#top').innerHTML = ''; $('#list').innerHTML = '';
+        setState('هنوز خبری منتشر نشده است.');
+        return;
+      }
+      const t = ITEMS[0];
+      $('#tickerTxt').textContent = t.title;
+      $('#ticker').hidden = false;
+      buildChips(); render();
+    } catch (err) {
+      if (!ITEMS.length) {
+        $('#hero').innerHTML = ''; $('#top').innerHTML = ''; $('#list').innerHTML = '';
+        setState('بارگذاری خبرها انجام نشد. اتصال را بررسی کنید.', true);
+      }
+    }
+  }
+
+  load(false);
+  setInterval(() => { if (!document.hidden) load(true); }, 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
