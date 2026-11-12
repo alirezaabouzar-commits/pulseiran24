@@ -160,16 +160,31 @@ p{margin:0;font-size:14px;line-height:1.8;color:var(--muted);display:-webkit-box
     render();
   };
 
+  // Matches the worker's /api/news shape: { ok, posts: [{ text, link, published, photo }] }
+  // and manual /admin posts ({ id, title, summary, ... }). Title rule mirrors splitTitleBody.
   function norm(it) {
-    const title = String(it.title || it.headline || '').trim();
-    const url = it.url || it.link || (it.id ? '/news/' + encodeURIComponent(it.id) : '');
+    const raw = String(it.text || '').replace(/<[^>]+>/g, '').trim();
+    let title = String(it.title || '').trim();
+    let summary = String(it.summary || '').trim();
+    if (!title && raw) {
+      const nl = raw.indexOf('\n');
+      title = (nl > 0 ? raw.slice(0, nl) : raw).trim();
+      summary = raw.slice(title.length).trim();
+    }
+    if (title.length > 140) title = title.slice(0, 140) + '…';
+    let url = '';
+    if (it.id) url = '/news/' + encodeURIComponent(it.id);
+    else {
+      const m = String(it.link || '').match(/(\d+)\s*$/);
+      if (m) url = '/news/' + m[1];
+    }
     return {
       title,
       url,
-      summary: String(it.summary || it.description || it.excerpt || '').replace(/<[^>]+>/g, '').trim(),
-      image: it.image || it.img || it.thumbnail || '',
-      category: it.category || it.cat || '',
-      date: it.date || it.published || it.pubDate || it.created || ''
+      summary: summary.slice(0, 220),
+      image: it.photo || it.image || it.img || '',
+      category: it.category || '',
+      date: it.published || it.date || it.created || ''
     };
   }
 
@@ -298,7 +313,7 @@ p{margin:0;font-size:14px;line-height:1.8;color:var(--muted);display:-webkit-box
       const r = await fetch('/api/news', { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
-      const arr = Array.isArray(j) ? j : (j.items || j.news || j.posts || []);
+      const arr = Array.isArray(j) ? j : (j.posts || j.items || j.news || []);
       ITEMS = arr.map(norm).filter(x => x.title && x.url);
       if (!ITEMS.length) {
         $('#hero').innerHTML = ''; $('#list').innerHTML = '';
