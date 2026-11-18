@@ -7104,6 +7104,20 @@ async function deBuild(env, ctx) {
 }
 
 async function handleDeNews(url, env, ctx) {
+  /* ?trtest=1 : یک دور ترجمه را داخل همین درخواست اجرا می‌کند و نتیجه را برمی‌گرداند (عیب‌یابی) */
+  if (url.searchParams.get("trtest") === "1") {
+    const t0 = Date.now();
+    const { items } = await deFetchFeeds();
+    let map = {};
+    try { map = JSON.parse(await edgeGet("deTrMap") || "{}") || {}; } catch (e) {}
+    const texts = items.map(i => i.t);
+    const lock = await edgeGet("deTrLock");
+    const cap = await edgeGet("deTrCount:" + new Date().toISOString().slice(0, 10));
+    const ran = await deTranslate(env, texts, map);
+    let last = null;
+    try { last = JSON.parse(await edgeGet("deTrLast") || "null"); } catch (e) {}
+    return new Response(JSON.stringify({ ran, ms: Date.now() - t0, lockBefore: !!lock, capBefore: cap, mapSize: Object.keys(map).length, last }), { headers: JSON_HEADERS });
+  }
   const data = await deBuild(env, ctx);
   const region = url.searchParams.get("r");
   const limit = Math.max(1, Math.min(60, parseInt(url.searchParams.get("limit") || "60", 10) || 60));
