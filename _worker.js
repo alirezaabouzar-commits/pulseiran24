@@ -6961,6 +6961,7 @@ function deParseFeed(xml, f) {
     const l = deTag(it, "link");
     if (!t || !/^https?:\/\//.test(l)) continue;
     let d = deTag(it, "description");
+    if (d === t) d = "";
     if (d.length > 260) d = d.slice(0, 257).replace(/\s+\S*$/, "") + "…";
     const pd = deTag(it, "pubDate") || deTag(it, "dc:date");
     const ts = Date.parse(pd);
