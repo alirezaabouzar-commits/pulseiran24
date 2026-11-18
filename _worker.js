@@ -1,4 +1,4 @@
-/* build: v109 — پوشش زنده: ویدیو و عکس در هر بند (پست تلگرام، یوتیوب/شورتز، فایل mp4/webm، عکس) + اسکیمای VideoObject برای یوتیوب | v108 — سئو: /tgimg دوباره برای گوگل باز (عکس خبر در Discover/Top Stories/Images) + بدون noindex روی عکس سالم + خطای شبکه ۴۰۴ به‌جای 502 | v107 — رفع نمایش &rlm; خام در تیتر: decodeNamed بعد از &amp; اجرا می‌شود + اصلاح متن‌های قدیمی KV هنگام نمایش | v106 — سئو: robots.txt مسیرهای فنی را می‌بندد + noindex روی /tgimg و /tgvid + پاک‌سازی خودکار خبرهای حذف‌شده‌ی تلگرام از article_index (رفع ۴۰۴ در sitemap) | v105 — ADMIN_TOKEN/SCAN_KEY با trim مقایسه می‌شوند (خط‌جدید ناخواسته هنگام کپی از Terminal) + /api/ax/diag بدون افشای مقدار | v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
+/* build: v110 — اخبار آلمان، هسن و هانائو: /almaan و /api/de-news (تیتر خودکار با ترجمهٔ Gemini در پس‌زمینه + پست دستی با #آلمان/#هسن/#هانائو)، بدون نوشتن در KV | v109 — پوشش زنده: ویدیو و عکس در هر بند (پست تلگرام، یوتیوب/شورتز، فایل mp4/webm، عکس) + اسکیمای VideoObject برای یوتیوب | v108 — سئو: /tgimg دوباره برای گوگل باز (عکس خبر در Discover/Top Stories/Images) + بدون noindex روی عکس سالم + خطای شبکه ۴۰۴ به‌جای 502 | v107 — رفع نمایش &rlm; خام در تیتر: decodeNamed بعد از &amp; اجرا می‌شود + اصلاح متن‌های قدیمی KV هنگام نمایش | v106 — سئو: robots.txt مسیرهای فنی را می‌بندد + noindex روی /tgimg و /tgvid + پاک‌سازی خودکار خبرهای حذف‌شده‌ی تلگرام از article_index (رفع ۴۰۴ در sitemap) | v105 — ADMIN_TOKEN/SCAN_KEY با trim مقایسه می‌شوند (خط‌جدید ناخواسته هنگام کپی از Terminal) + /api/ax/diag بدون افشای مقدار | v104 — میز هشدار AI: اسکن خودکار فیدها، سنجش پوشش چندمنبعی، پیش‌نویس فارسی و تأیید با دکمه در تلگرام (/api/ax/*، /ax-edit) | v103 — پوشش زنده: /live، /live/{id}، /live-admin، /api/live با اسکیمای LiveBlogPosting؛ هر بند ۱ نوشتن در KV، خواندن از Edge Cache | v102 — ترجمهٔ صفحهٔ خبر en/de با Gemini در پس‌زمینه (گوگل رایگان Cloudflare را با 429 رد می‌کند)، سقف روزانه، کش دائمی KV | v101 — صفحه خبر en/de: ترجمه‌ی ناموفق دیگر در KV نمی‌ماند + ترجمه‌ی جایگزین در مرورگر + /api/tr-test + /tgimg و /tgvid: فایل منقضی تلگرام 404 + noindex به‌جای 400 | v100 — لینک خبرها در /en و /de به نسخه ترجمه‌شده /en/news/{id} و /de/news/{id}؛ عنوان و توضیح صفحه اصلی /en و /de | v99 — اتاق خبر هوشمند: بازنویسی فارسی خبر رسانه‌های مجاز با Gemini (پنل /ai-newsroom) | v97 — فرم تماس: تلگرام + Resend به‌جای Web3Forms | v96 — هدرهای امنیتی سراسری + سخت‌سازی پروکسی تلگرام | v95 — فرم نظر موقتاً غیرفعال (تا انتشار Impressum/Datenschutz) | v94 — /api/worldcup: گل به خودی به تیم درست، نوار بالای کارت هیچ‌وقت خالی نمی‌ماند */
 /* ============================================================
    Pulse Iran 24 — Cloudflare Pages Worker
    جایگزین کامل Netlify Functions:
@@ -245,6 +245,10 @@ async function route(request, env, ctx) {
     if (path === "/api/ax/diag")   return axHandleDiag(env);
     if (path === "/api/ax/draft")  return axHandleDraft(request, env);
     if (path === "/ax-edit" || path === "/ax-edit/") return axEditPage();
+
+    /* v110 — اخبار آلمان، هسن و هانائو */
+    if (path === "/api/de-news") return handleDeNews(url, env, ctx);
+    if (path === "/almaan" || path === "/almaan/") return handleAlmaanPage(url, env, ctx);
 
     return env.ASSETS.fetch(request);
 }
@@ -2535,6 +2539,7 @@ async function handleSitemap(url, env) {
   for (const p of ["darbare.html", "khatte-mashy.html", "tashih.html", "jarayed.html", "rooydad.html", "podcast.html"]) {
     urls.push(`  <url><loc>${SITE_ORIGIN}/${p}</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>`);
   }
+  urls.push(`  <url><loc>${SITE_ORIGIN}/almaan</loc><changefreq>hourly</changefreq><priority>0.7</priority></url>`); /* v110 */
   for (const u of await tahlilSitemapUrlsI18n(env)) urls.push(u);
   try { for (const u of await lbSitemapUrls(env)) urls.push("  " + u); } catch (e) {} /* v103 */
   for (const it of index.slice(0, 2000)) {
@@ -6921,4 +6926,279 @@ function axHandleDiag(env) {
     return { set: true, length: v.length, trimmedLength: v.trim().length, hasWhitespace: /\s/.test(v) };
   };
   return axJson({ ADMIN_TOKEN: info(env && env.ADMIN_TOKEN), SCAN_KEY: info(env && env.SCAN_KEY) });
+}
+
+/* ============================================================
+   v110 — اخبار آلمان، هسن و هانائو
+   /api/de-news  : تیترهای خودکار (ترجمهٔ ماشینی آلمانی→فارسی با Gemini) + پست‌های دستی
+   /almaan       : صفحهٔ اختصاصی؛ /almaan?embed=1 نسخهٔ جمع‌وجور برای صفحهٔ اول
+   پست دستی: در /admin متن را با #آلمان یا #هسن یا #هانائو شروع کنید.
+   هیچ نوشتنی در KV انجام نمی‌شود؛ همهٔ کش‌ها در کش لبه‌اند.
+   ============================================================ */
+const DE_FEEDS = [
+  { r: "de",    s: "Tagesschau",  url: "https://www.tagesschau.de/index~rss2.xml" },
+  { r: "hessen", s: "hessenschau", url: "https://www.hessenschau.de/index.rss" },
+  { r: "hanau", s: "Op-Online Hanau", url: "https://www.op-online.de/region/hanau/rssfeed.rdf" }
+];
+const DE_PER_FEED = 10;
+const DE_TR_DAILY_CAP = 48;
+const DE_REGION_FA = { de: "آلمان", hessen: "هسن", hanau: "هانائو" };
+const DE_TAGS = [["#هانائو", "hanau"], ["#هسن", "hessen"], ["#آلمان", "de"]];
+
+function deTag(xmlItem, name) {
+  const m = new RegExp("<" + name + "[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/" + name + ">", "i").exec(xmlItem);
+  return m ? decodeEntities(m[1]).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "";
+}
+
+function deParseFeed(xml, f) {
+  const out = [];
+  const re = /<item[\s>][\s\S]*?<\/item>/gi;
+  let m;
+  const x = String(xml).slice(0, 400000);
+  while ((m = re.exec(x)) && out.length < DE_PER_FEED) {
+    const it = m[0];
+    const t = deTag(it, "title");
+    const l = deTag(it, "link");
+    if (!t || !/^https?:\/\//.test(l)) continue;
+    let d = deTag(it, "description");
+    if (d.length > 260) d = d.slice(0, 257).replace(/\s+\S*$/, "") + "…";
+    const pd = deTag(it, "pubDate") || deTag(it, "dc:date");
+    const ts = Date.parse(pd);
+    out.push({ r: f.r, s: f.s, t, d, l, p: isNaN(ts) ? null : new Date(ts).toISOString() });
+  }
+  return out;
+}
+
+async function deFetchFeeds() {
+  const res = await Promise.allSettled(DE_FEEDS.map(async f => {
+    const r = await fetch(f.url, {
+      headers: { "User-Agent": "Mozilla/5.0 (PulseIran24 DeNews)" },
+      cf: { cacheTtl: 600, cacheEverything: true }
+    });
+    if (!r.ok) throw new Error(f.s + " " + r.status);
+    return deParseFeed(await r.text(), f);
+  }));
+  const items = [], status = {};
+  res.forEach((x, i) => {
+    const f = DE_FEEDS[i];
+    if (x.status === "fulfilled") { items.push(...x.value); status[f.r] = x.value.length; }
+    else status[f.r] = "error";
+  });
+  return { items, status };
+}
+
+/* کلید کوتاه برای نقشهٔ ترجمه */
+function deKey(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36) + s.length.toString(36);
+}
+
+async function deTrCall(env, model, texts) {
+  const sys = "You translate German news headlines and teasers into Persian (Farsi) for an Iranian diaspora audience in Germany. " +
+    "Translate faithfully in a neutral news-agency style. Keep names, numbers, dates and attributions exactly; do not add, omit or comment. " +
+    "Write German place and person names in common Persian spelling. " +
+    "Return ONLY a JSON array of strings with exactly the same number of items, in the same order, as the input array.";
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const r = await fetch(AI_GEMINI_BASE + "/models/" + encodeURIComponent(model) + ":generateContent", {
+      method: "POST", signal: ctl.signal,
+      headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: sys }] },
+        contents: [{ role: "user", parts: [{ text: JSON.stringify(texts) }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 8192, responseMimeType: "application/json" }
+      })
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const cand = d && d.candidates && d.candidates[0];
+    if (!cand) return null;
+    let text = "";
+    for (const p of (cand.content && cand.content.parts) || []) if (p && !p.thought && typeof p.text === "string") text += p.text;
+    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    let arr = null;
+    try { arr = JSON.parse(text); } catch (e) {
+      const a = text.indexOf("["), b = text.lastIndexOf("]");
+      if (a >= 0 && b > a) { try { arr = JSON.parse(text.slice(a, b + 1)); } catch (e2) {} }
+    }
+    if (!Array.isArray(arr) || arr.length !== texts.length || arr.some(v => typeof v !== "string" || !v.trim())) return null;
+    return arr.map(v => v.trim());
+  } catch (e) { return null; } finally { clearTimeout(timer); }
+}
+
+/* ترجمهٔ متن‌های تازه؛ نقشهٔ ترجمه یک روز در کش لبه می‌ماند */
+async function deTranslate(env, texts, map) {
+  if (!env || !env.GEMINI_API_KEY) return false;
+  const todo = [...new Set(texts.filter(t => t && !map[deKey(t)]))].slice(0, 60);
+  if (!todo.length) return false;
+  if (await edgeGet("deTrLock")) return false;
+  await edgePut("deTrLock", "1", 90);
+  const capKey = "deTrCount:" + new Date().toISOString().slice(0, 10);
+  const used = parseInt(await edgeGet(capKey) || "0", 10) || 0;
+  if (used >= DE_TR_DAILY_CAP) return false;
+  await edgePut(capKey, String(used + 1), 90000);
+  const models = await artTrModels(env);
+  for (const model of models.slice(0, 2)) {
+    const out = await deTrCall(env, model, todo);
+    if (out) {
+      todo.forEach((t, i) => { map[deKey(t)] = out[i]; });
+      await edgePut("deTrMap", JSON.stringify(map), 86400);
+      return true;
+    }
+  }
+  return false;
+}
+
+function deManualFromPosts(posts) {
+  const out = [];
+  const cutoff = Date.now() - 30 * 86400000;
+  for (const p of posts || []) {
+    const raw = String(p && p.text || "").trim();
+    const tag = DE_TAGS.find(([h]) => raw.startsWith(h));
+    if (!tag) continue;
+    const ts = Date.parse(p.published);
+    if (!isNaN(ts) && ts < cutoff) continue;
+    const { title, body } = splitTitleBody(raw.slice(tag[0].length).trim());
+    let d = String(body || "").replace(/\s+/g, " ").trim();
+    if (d.length > 260) d = d.slice(0, 257).replace(/\s+\S*$/, "") + "…";
+    out.push({ r: tag[1], s: "پالس ایران ۲۴", t: title, d, l: p.link || "/", p: isNaN(ts) ? null : new Date(ts).toISOString(), m: 1, ph: p.photo || null });
+  }
+  out.sort((a, b) => String(b.p || "").localeCompare(String(a.p || "")));
+  return out;
+}
+
+async function deBuild(env, ctx) {
+  const hit = await edgeGet("deNews:v1");
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+
+  const [{ items, status }, posts] = await Promise.all([deFetchFeeds(), getManualPosts(env).catch(() => [])]);
+  let map = {};
+  try { map = JSON.parse(await edgeGet("deTrMap") || "{}") || {}; } catch (e) { map = {}; }
+
+  const texts = [];
+  for (const it of items) { texts.push(it.t); if (it.d) texts.push(it.d); }
+  const missing = texts.some(t => !map[deKey(t)]);
+  /* ترجمه پس‌زمینه انجام می‌شود تا صفحه منتظر نماند؛ تا آن موقع متن آلمانی نشان داده می‌شود */
+  if (missing && ctx && ctx.waitUntil) ctx.waitUntil(deTranslate(env, texts, map));
+
+  const auto = items.map(it => {
+    const ft = map[deKey(it.t)], fd = it.d ? map[deKey(it.d)] : "";
+    return { r: it.r, s: it.s, t: ft || it.t, d: it.d ? (fd || it.d) : "", l: it.l, p: it.p,
+             tr: ft ? 1 : 0, o: ft ? it.t : undefined };
+  });
+  auto.sort((a, b) => String(b.p || "").localeCompare(String(a.p || "")));
+  const data = { ok: true, updated: new Date().toISOString(), status, manual: deManualFromPosts(posts), items: auto };
+  /* اگر هنوز ترجمه کامل نیست کش کوتاه، وگرنه ۲۰ دقیقه */
+  await edgePut("deNews:v1", JSON.stringify(data), missing ? 120 : 1200, ctx);
+  return data;
+}
+
+async function handleDeNews(url, env, ctx) {
+  const data = await deBuild(env, ctx);
+  const region = url.searchParams.get("r");
+  const limit = Math.max(1, Math.min(60, parseInt(url.searchParams.get("limit") || "60", 10) || 60));
+  const f = a => region && DE_REGION_FA[region] ? a.filter(x => x.r === region) : a;
+  const out = { ...data, manual: f(data.manual).slice(0, limit), items: f(data.items).slice(0, limit) };
+  return new Response(JSON.stringify(out), { headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=120" } });
+}
+
+function deAgo(iso) {
+  const ts = Date.parse(iso);
+  if (isNaN(ts)) return "";
+  const min = Math.max(1, Math.round((Date.now() - ts) / 60000));
+  if (min < 60) return toFaDigits(min) + " دقیقه پیش";
+  const h = Math.round(min / 60);
+  if (h < 24) return toFaDigits(h) + " ساعت پیش";
+  return formatFaDate(iso);
+}
+
+function deCard(x, embed) {
+  const ext = /^https?:\/\//.test(x.l);
+  const target = ext || embed ? ' target="_blank" rel="noopener noreferrer"' : ' target="_top"';
+  const badge = x.m ? '<span class="b own">گزارش پالس</span>' : (x.tr ? '<span class="b">ترجمهٔ خودکار</span>' : '<span class="b de">آلمانی</span>');
+  return '<a class="card" data-r="' + escHtml(x.r) + '" href="' + escHtml(x.l) + '"' + target + '>' +
+    '<div class="meta"><span class="reg">' + escHtml(DE_REGION_FA[x.r] || "") + '</span>' + badge +
+    '<span class="src">' + escHtml(x.s) + '</span><span class="ago">' + escHtml(deAgo(x.p)) + '</span></div>' +
+    '<h3' + (x.tr || x.m ? "" : ' dir="ltr" lang="de"') + '>' + escHtml(x.t) + '</h3>' +
+    (x.d && !embed ? '<p' + (x.tr || x.m ? "" : ' dir="ltr" lang="de"') + '>' + escHtml(x.d) + '</p>' : "") +
+    '</a>';
+}
+
+async function handleAlmaanPage(url, env, ctx) {
+  const embed = url.searchParams.get("embed") === "1";
+  let data;
+  try { data = await deBuild(env, ctx); } catch (e) { data = { manual: [], items: [] }; }
+  const all = [...(data.manual || []), ...(data.items || [])];
+  const list = embed ? [...(data.manual || []).slice(0, 2), ...(data.items || [])].slice(0, 5) : all;
+  const cards = list.length ? list.map(x => deCard(x, embed)).join("")
+    : '<div class="empty">فعلاً خبری دریافت نشد. چند دقیقهٔ دیگر دوباره سر بزنید.</div>';
+  const title = "اخبار آلمان، هسن و هانائو | پالس ایران ۲۴";
+  const desc = "تیترهای روز آلمان، ایالت هسن و شهر هانائو به فارسی — ترجمهٔ خودکار از رسانه‌های آلمانی و گزارش‌های پالس ایران ۲۴.";
+  const tabs = embed ? "" : '<nav class="tabs" role="tablist">' +
+    [["all", "همه"], ["de", "آلمان"], ["hessen", "هسن"], ["hanau", "هانائو"]]
+      .map(([k, v], i) => '<button role="tab" data-f="' + k + '"' + (i === 0 ? ' class="on" aria-selected="true"' : "") + '>' + v + '</button>').join("") + '</nav>';
+  const html = `<!DOCTYPE html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escHtml(title)}</title>
+<meta name="description" content="${escHtml(desc)}">
+${embed ? '<meta name="robots" content="noindex">' : `<link rel="canonical" href="${SITE_ORIGIN}/almaan">
+<meta property="og:title" content="${escHtml(title)}"><meta property="og:description" content="${escHtml(desc)}">
+<meta property="og:url" content="${SITE_ORIGIN}/almaan"><meta property="og:image" content="${SITE_ORIGIN}/logo.png">`}
+<link rel="stylesheet" href="/assets/fonts/vazirmatn.css">
+<script>(function(){var t='light';try{t=localStorage.getItem('pi24-theme')||'light'}catch(e){}document.documentElement.setAttribute('data-theme',t)})();</script>
+<style>
+:root{--bg:#0D1117;--card:#161B22;--line:#2A313C;--tx:#E6EDF3;--mu:#8B949E;--ac:#E5484D;--de:#D4A72C}
+html[data-theme="light"]{--bg:#F7F8FA;--card:#FFFFFF;--line:#E3E6EB;--tx:#16202C;--mu:#5B6573;--ac:#C62E37;--de:#9A6B00}
+*{box-sizing:border-box}
+body{margin:0;background:${embed ? "transparent" : "var(--bg)"};color:var(--tx);font-family:Vazirmatn,Tahoma,sans-serif;line-height:1.7}
+.wrap{max-width:820px;margin:0 auto;padding:${embed ? "0" : "20px 16px 48px"}}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+header.top a.home{color:var(--mu);text-decoration:none;font-size:14px}
+h1{font-size:24px;margin:6px 0 4px}
+.lead{color:var(--mu);font-size:14px;margin:0 0 14px}
+.flag{display:inline-block;width:22px;height:14px;border-radius:2px;vertical-align:-1px;margin-left:6px;background:linear-gradient(#000 0 33.3%,#DD0000 33.3% 66.6%,#FFCE00 66.6%)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.tabs button{font:inherit;font-size:14px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--tx);cursor:pointer}
+.tabs button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.list{display:grid;gap:10px}
+.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;color:inherit;text-decoration:none}
+.card:hover{border-color:var(--ac)}
+.card h3{font-size:16px;margin:4px 0 2px;font-weight:700}
+.card p{font-size:14px;color:var(--mu);margin:2px 0 0}
+.meta{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--mu)}
+.reg{color:var(--ac);font-weight:700}
+.b{border:1px solid var(--line);border-radius:6px;padding:0 6px}
+.b.own{border-color:var(--ac);color:var(--ac)}
+.b.de{border-color:var(--de);color:var(--de)}
+.ago{margin-inline-start:auto}
+.empty{color:var(--mu);padding:24px;text-align:center;border:1px dashed var(--line);border-radius:14px}
+.more{display:block;text-align:center;margin-top:10px;color:var(--ac);font-weight:700;text-decoration:none}
+.note{color:var(--mu);font-size:12px;margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
+</style></head><body><div class="wrap">
+${embed ? "" : `<header class="top"><a class="home" href="/">→ پالس ایران ۲۴</a></header>
+<h1><span class="flag" aria-hidden="true"></span>اخبار آلمان، هسن و هانائو</h1>
+<p class="lead">تیترهای روز به فارسی برای ایرانیان آلمان. روی هر خبر بزنید تا متن کامل در منبع اصلی باز شود.</p>`}
+${tabs}
+<div class="list" id="list">${cards}</div>
+${embed ? '<a class="more" href="/almaan" target="_top">همهٔ اخبار آلمان و هسن ←</a>' :
+`<p class="note">تیترهایی که «ترجمهٔ خودکار» دارند با هوش مصنوعی از منبع آلمانی ترجمه شده‌اند و ممکن است خطا داشته باشند؛ متن معتبر همان منبع اصلی است. منابع: Tagesschau (ARD)، hessenschau (hr)، Op-Online (هانائو). «گزارش پالس» نوشتهٔ تحریریهٔ پالس ایران ۲۴ است.</p>`}
+</div>
+<script>
+(function(){
+  var tabs=document.querySelectorAll('.tabs button');
+  tabs.forEach(function(b){b.addEventListener('click',function(){
+    tabs.forEach(function(x){x.classList.remove('on');x.removeAttribute('aria-selected')});
+    b.classList.add('on');b.setAttribute('aria-selected','true');
+    var f=b.getAttribute('data-f');
+    document.querySelectorAll('#list .card').forEach(function(c){c.style.display=(f==='all'||c.getAttribute('data-r')===f)?'':'none'});
+  })});
+  function h(){try{parent.postMessage({type:'almaan-height',height:document.documentElement.scrollHeight},'*')}catch(e){}}
+  if(${embed ? "true" : "false"}){window.addEventListener('load',h);setTimeout(h,300);}
+})();
+</script>
+</body></html>`;
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120" } });
 }

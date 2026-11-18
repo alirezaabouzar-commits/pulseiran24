@@ -944,6 +944,7 @@
       <span class="live-badge-slim" id="t-badge"><span class="live-dot"></span> پوشش زنده خبر در تلگرام</span>
       <a class="btn-slim btn-live" href="/live" id="t-liveblog" style="display:none">پوشش زنده</a>
       <a class="btn-slim btn-tahlil" href="/tahlil" id="t-tahlil">🎧 تحلیل صوتی</a>
+      <a class="btn-slim" href="/almaan" id="t-almaan">🇩🇪 آلمان و هسن</a>
       <a class="btn-slim" href="/jam2026.html" id="t-livescores">⚽ نتایج زنده فوتبال</a>
       <a class="btn-slim" href="/podcast.html" id="t-podcast">🎙 پادکست</a>
       <a class="btn-slim" href="/archive.html" id="t-archive">🗂 آرشیو</a>
@@ -1182,6 +1183,26 @@
   });
 </script>
 
+<!-- v110: بخش اخبار آلمان، هسن و هانائو (۵ تیتر آخر؛ صفحهٔ کامل در /almaan) -->
+<section class="section" id="almaanSection">
+  <div class="section-head">
+    <span class="bar"></span>
+    <h2 id="t-almaanTitle">اخبار آلمان، هسن و هانائو</h2>
+  </div>
+  <iframe id="almaanFrame" src="/almaan?embed=1" title="اخبار آلمان، هسن و هانائو"
+    style="width:100%;height:520px;border:0;display:block;margin:0 auto;background:transparent;transition:height .3s ease"
+    loading="lazy" scrolling="no"></iframe>
+</section>
+<script>
+  window.addEventListener('message', function(e){
+    if(!e || !e.data) return;
+    if(e.data.type === 'almaan-height' && e.data.height){
+      var f = document.getElementById('almaanFrame');
+      if(f) f.style.height = (e.data.height + 8) + 'px';
+    }
+  });
+</script>
+
 <!-- بخش جراید بین‌المللی -->
 <section class="section" id="jarayedSection">
   <div class="section-head">
@@ -1407,6 +1428,7 @@
   </div>
   <div class="legal-links">
     <a href="/tahlil" id="t-ftahlil">🎧 تحلیل صوتی</a>
+    <a href="/almaan" id="t-falmaan">🇩🇪 آلمان و هسن</a>
     <a href="/podcast.html" id="t-fpodcast">🎙 پادکست</a>
     <a href="/archive.html" id="t-farchive">🗂 آرشیو</a>
   </div>
@@ -1490,6 +1512,7 @@ const I18N = {
     liveBadge: "زنده",
     rooydad: "رویدادهای روز",
     jarayedTitle: "جراید بین‌المللی",
+    almaan: "🇩🇪 آلمان و هسن", almaanTitle: "اخبار آلمان، هسن و هانائو",
     sources: "منابع خبری معتبر",
     market: "💹 بازار",
     ytwatch: "▶ تماشای زنده در یوتیوب",
@@ -1566,6 +1589,7 @@ const I18N = {
     liveBadge: "LIVE",
     rooydad: "Today's Events",
     jarayedTitle: "International Press",
+    almaan: "🇩🇪 Germany & Hesse", almaanTitle: "Germany, Hesse & Hanau (in Persian)",
     sources: "Trusted News Sources",
     market: "💹 Markets",
     ytwatch: "▶ Watch live on YouTube",
@@ -1642,6 +1666,7 @@ const I18N = {
     liveBadge: "LIVE",
     rooydad: "Ereignisse des Tages",
     jarayedTitle: "Internationale Presse",
+    almaan: "🇩🇪 Deutschland & Hessen", almaanTitle: "Deutschland, Hessen & Hanau (auf Persisch)",
     sources: "Vertrauenswürdige Quellen",
     market: "💹 Märkte",
     ytwatch: "▶ Live auf YouTube ansehen",
@@ -2224,6 +2249,7 @@ function applyUI() {
     "t-tahlil": "tahlil", "t-ftahlil": "tahlil", "t-fpodcast": "podcast", "t-farchive": "archivelnk",
     "t-liveblog": "liveblog",
     "t-football": "football", "t-rooydad": "rooydad", "t-jarayed": "jarayedTitle",
+    "t-almaan": "almaan", "t-falmaan": "almaan", "t-almaanTitle": "almaanTitle",
     "t-sources": "sources", "t-market": "market",
     "t-l1": "l1", "t-l2": "l2", "t-l3": "l3",
     "t-nsintro": "nsIntro", "t-nsfa": "nsFa", "t-nsintl": "nsIntl", "liveYtLink": "ytShort"
