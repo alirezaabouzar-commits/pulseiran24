@@ -6951,6 +6951,34 @@ function deTag(xmlItem, name) {
   return m ? decodeEntities(m[1]).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "";
 }
 
+/* عکس خبر از خود فید (enclosure / media:content / اولین img در content:encoded) + نام عکاس/آژانس.
+   عکس روی سرور ما کپی نمی‌شود؛ مستقیم از سایت منبع نشان داده می‌شود و منبع ذکر می‌شود. */
+function deImage(it, f) {
+  let im = "", cr = "";
+  let m = /<enclosure[^>]+url="([^"]+)"[^>]*type="image\//i.exec(it) || /<enclosure[^>]+type="image\/[^"]*"[^>]*url="([^"]+)"/i.exec(it);
+  if (m) im = m[1];
+  if (!im) { m = /<media:content[^>]+url="([^"]+)"/i.exec(it) || /<media:thumbnail[^>]+url="([^"]+)"/i.exec(it); if (m) im = m[1]; }
+  if (!im) {
+    const ce = /<content:encoded>([\s\S]*?)<\/content:encoded>/i.exec(it);
+    if (ce) {
+      const img = /<img[^>]+src="([^"]+)"[^>]*>/i.exec(ce[1]);
+      if (img) {
+        im = img[1];
+        const alt = /alt="([^"]*)"/i.exec(img[0]);
+        if (alt && alt[1].indexOf("|") >= 0) cr = alt[1].split("|").pop().trim();
+      }
+    }
+  }
+  const mc = /<media:copyright>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/media:copyright>/i.exec(it);
+  if (mc) cr = decodeEntities(mc[1]).trim();
+  im = decodeEntities(im).trim();
+  if (!/^https:\/\//.test(im)) im = "";
+  /* tagesschau عکس ۱۹۲۰ پیکسلی می‌دهد؛ برای کارت نسخهٔ کوچک‌تر کافی است */
+  if (im && /images\.tagesschau\.de/.test(im)) im = im.replace(/width=\d+/, "width=640");
+  cr = cr.replace(/<[^>]+>/g, "").slice(0, 80);
+  return { im: im || null, cr: cr || null };
+}
+
 function deParseFeed(xml, f) {
   const out = [];
   const re = /<item[\s>][\s\S]*?<\/item>/gi;
@@ -6966,7 +6994,9 @@ function deParseFeed(xml, f) {
     if (d.length > 260) d = d.slice(0, 257).replace(/\s+\S*$/, "") + "…";
     const pd = deTag(it, "pubDate") || deTag(it, "dc:date");
     const ts = Date.parse(pd);
-    out.push({ r: f.r, s: f.s, t, d, l, p: isNaN(ts) ? null : new Date(ts).toISOString() });
+    const { im, cr } = deImage(it, f);
+    const v = /\/(video|multimedia\/video)\//i.test(l) ? 1 : 0;
+    out.push({ r: f.r, s: f.s, t, d, l, p: isNaN(ts) ? null : new Date(ts).toISOString(), im, cr, v });
   }
   return out;
 }
@@ -7074,7 +7104,8 @@ function deManualFromPosts(posts) {
     const { title, body } = splitTitleBody(raw.slice(tag[0].length).trim());
     let d = String(body || "").replace(/\s+/g, " ").trim();
     if (d.length > 260) d = d.slice(0, 257).replace(/\s+\S*$/, "") + "…";
-    out.push({ r: tag[1], s: "پالس ایران ۲۴", t: title, d, l: p.link || "/", p: isNaN(ts) ? null : new Date(ts).toISOString(), m: 1, ph: p.photo || null });
+    out.push({ r: tag[1], s: "پالس ایران ۲۴", t: title, d, l: p.link || "/", p: isNaN(ts) ? null : new Date(ts).toISOString(), m: 1,
+               im: p.photo || p.vthumb || null, vd: p.video || null, v: p.video ? 1 : 0 });
   }
   out.sort((a, b) => String(b.p || "").localeCompare(String(a.p || "")));
   return out;
@@ -7098,7 +7129,7 @@ async function deBuild(env, ctx) {
   const auto = items.map(it => {
     const ft = map[deKey(it.t)], fd = it.d ? map[deKey(it.d)] : "";
     return { r: it.r, s: it.s, t: ft || it.t, d: it.d ? (fd || it.d) : "", l: it.l, p: it.p,
-             tr: ft ? 1 : 0, o: ft ? it.t : undefined };
+             tr: ft ? 1 : 0, o: ft ? it.t : undefined, im: it.im, cr: it.cr, v: it.v };
   });
   auto.sort((a, b) => String(b.p || "").localeCompare(String(a.p || "")));
   const data = { ok: true, updated: new Date().toISOString(), status, manual: deManualFromPosts(posts), items: auto };
@@ -7142,16 +7173,32 @@ function deAgo(iso) {
   return formatFaDate(iso);
 }
 
-function deCard(x, embed) {
+function deCard(x, embed, lead) {
   const ext = /^https?:\/\//.test(x.l);
   const target = ext || embed ? ' target="_blank" rel="noopener noreferrer"' : ' target="_top"';
   const badge = x.m ? '<span class="b own">گزارش پالس</span>' : (x.tr ? '<span class="b">ترجمهٔ خودکار</span>' : '<span class="b de">آلمانی</span>');
-  return '<a class="card" data-r="' + escHtml(x.r) + '" href="' + escHtml(x.l) + '"' + target + '>' +
-    '<div class="meta"><span class="reg">' + escHtml(DE_REGION_FA[x.r] || "") + '</span>' + badge +
+  const vbadge = x.v ? '<span class="b vid">▶ ویدیو</span>' : "";
+  const de = x.tr || x.m ? "" : ' dir="ltr" lang="de"';
+  const credit = x.m ? "" : ("© " + (x.cr ? x.cr + " / " : "") + x.s);
+  let media = "";
+  /* ویدیوی خودِ پالس (mp4) در صفحهٔ کامل همان‌جا پخش می‌شود */
+  if (x.vd && !embed && lead) {
+    media = '<div class="media"><video controls playsinline preload="metadata"' + (x.im ? ' poster="' + escHtml(x.im) + '"' : "") + ' src="' + escHtml(x.vd) + '"></video></div>';
+  } else if (x.im) {
+    media = '<div class="media"><img src="' + escHtml(x.im) + '" alt="" loading="' + (lead ? "eager" : "lazy") + '" decoding="async" onerror="this.parentNode.remove()">' +
+      (x.v ? '<span class="play" aria-hidden="true">▶</span>' : "") +
+      (credit ? '<span class="cr">' + escHtml(credit) + '</span>' : "") + '</div>';
+  }
+  const inner = '<div class="meta"><span class="reg">' + escHtml(DE_REGION_FA[x.r] || "") + '</span>' + badge + vbadge +
     '<span class="src">' + escHtml(x.s) + '</span><span class="ago">' + escHtml(deAgo(x.p)) + '</span></div>' +
-    '<h3' + (x.tr || x.m ? "" : ' dir="ltr" lang="de"') + '>' + escHtml(x.t) + '</h3>' +
-    (x.d && !embed ? '<p' + (x.tr || x.m ? "" : ' dir="ltr" lang="de"') + '>' + escHtml(x.d) + '</p>' : "") +
-    '</a>';
+    '<h3' + de + '>' + escHtml(x.t) + '</h3>' +
+    (x.d && !embed ? '<p' + de + '>' + escHtml(x.d) + '</p>' : "");
+  /* کارت ویدیویی پالس: لینک کل کارت روی پلیر نیفتد */
+  if (x.vd && !embed && lead) {
+    return '<div class="card lead" data-r="' + escHtml(x.r) + '">' + media + '<a class="txt" href="' + escHtml(x.l) + '"' + target + '>' + inner + '</a></div>';
+  }
+  return '<a class="card' + (lead ? " lead" : "") + (media ? " hasimg" : "") + '" data-r="' + escHtml(x.r) + '" href="' + escHtml(x.l) + '"' + target + '>' +
+    media + '<div class="txt">' + inner + '</div></a>';
 }
 
 async function handleAlmaanPage(url, env, ctx) {
@@ -7160,7 +7207,7 @@ async function handleAlmaanPage(url, env, ctx) {
   try { data = await deBuild(env, ctx); } catch (e) { data = { manual: [], items: [] }; }
   const all = [...(data.manual || []), ...(data.items || [])];
   const list = embed ? [...(data.manual || []).slice(0, 2), ...(data.items || [])].slice(0, 5) : all;
-  const cards = list.length ? list.map(x => deCard(x, embed)).join("")
+  const cards = list.length ? list.map((x, i) => deCard(x, embed, !embed && i === 0)).join("")
     : '<div class="empty">فعلاً خبری دریافت نشد. چند دقیقهٔ دیگر دوباره سر بزنید.</div>';
   const title = "اخبار آلمان، هسن و هانائو | پالس ایران ۲۴";
   const desc = "تیترهای روز آلمان، ایالت هسن و شهر هانائو به فارسی — ترجمهٔ خودکار از رسانه‌های آلمانی و گزارش‌های پالس ایران ۲۴.";
@@ -7192,7 +7239,19 @@ h1{font-size:24px;margin:6px 0 4px}
 .tabs button{font:inherit;font-size:14px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--tx);cursor:pointer}
 .tabs button.on{background:var(--ac);border-color:var(--ac);color:#fff}
 .list{display:grid;gap:10px}
-.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;color:inherit;text-decoration:none}
+.card{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;color:inherit;text-decoration:none;overflow:hidden}
+.card .txt{flex:1;min-width:0;color:inherit;text-decoration:none;display:block}
+.media{position:relative;flex:0 0 ${embed ? "112px" : "168px"};aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:var(--line)}
+.media img,.media video{width:100%;height:100%;object-fit:cover;display:block}
+.media .play{position:absolute;inset:0;margin:auto;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;padding-left:3px}
+.media .cr{position:absolute;bottom:0;left:0;right:0;font-size:9.5px;line-height:1.4;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.7));padding:10px 6px 3px;direction:ltr;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card.lead{flex-direction:column;padding:0}
+.card.lead .media{flex:none;width:100%;border-radius:0}
+.card.lead .media .cr{font-size:11px}
+.card.lead .txt{padding:10px 14px 14px;width:100%}
+.card.lead h3{font-size:20px}
+.b.vid{border-color:var(--ac);color:var(--ac)}
+@media (max-width:520px){.media{flex-basis:${embed ? "96px" : "112px"}}.card:not(.lead) p{display:none}}
 .card:hover{border-color:var(--ac)}
 .card h3{font-size:16px;margin:4px 0 2px;font-weight:700}
 .card p{font-size:14px;color:var(--mu);margin:2px 0 0}
