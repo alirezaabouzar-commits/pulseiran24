@@ -7013,7 +7013,11 @@ async function deTrCall(env, model, texts) {
         generationConfig: { temperature: 0.2, maxOutputTokens: 8192, responseMimeType: "application/json" }
       })
     });
-    if (!r.ok) return { err: "http " + r.status };
+    if (!r.ok) {
+      let m = "";
+      try { const j = await r.json(); m = String(j && j.error && j.error.message || "").slice(0, 300); } catch (e) {}
+      return { err: "http " + r.status + " " + m };
+    }
     const d = await r.json();
     const cand = d && d.candidates && d.candidates[0];
     if (!cand) return { err: "no candidate" };
