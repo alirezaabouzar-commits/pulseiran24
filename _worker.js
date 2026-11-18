@@ -7101,7 +7101,7 @@ async function handleDeNews(url, env, ctx) {
   const region = url.searchParams.get("r");
   const limit = Math.max(1, Math.min(60, parseInt(url.searchParams.get("limit") || "60", 10) || 60));
   const f = a => region && DE_REGION_FA[region] ? a.filter(x => x.r === region) : a;
-  const out = { ...data, manual: f(data.manual).slice(0, limit), items: f(data.items).slice(0, limit) };
+  const out = { ...data, trKey: !!(env && env.GEMINI_API_KEY), manual: f(data.manual).slice(0, limit), items: f(data.items).slice(0, limit) };
   return new Response(JSON.stringify(out), { headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=120" } });
 }
 
