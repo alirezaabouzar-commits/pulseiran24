@@ -6941,7 +6941,8 @@ const DE_FEEDS = [
   { r: "hanau", s: "Op-Online Hanau", url: "https://www.op-online.de/region/hanau/rssfeed.rdf" }
 ];
 const DE_PER_FEED = 10;
-const DE_TR_DAILY_CAP = 48;
+const DE_TR_DAILY_CAP = 80;
+const DE_TR_BATCH = 15;
 const DE_REGION_FA = { de: "آلمان", hessen: "هسن", hanau: "هانائو" };
 const DE_TAGS = [["#هانائو", "hanau"], ["#هسن", "hessen"], ["#آلمان", "de"]];
 
@@ -7012,10 +7013,10 @@ async function deTrCall(env, model, texts) {
         generationConfig: { temperature: 0.2, maxOutputTokens: 8192, responseMimeType: "application/json" }
       })
     });
-    if (!r.ok) return null;
+    if (!r.ok) return { err: "http " + r.status };
     const d = await r.json();
     const cand = d && d.candidates && d.candidates[0];
-    if (!cand) return null;
+    if (!cand) return { err: "no candidate" };
     let text = "";
     for (const p of (cand.content && cand.content.parts) || []) if (p && !p.thought && typeof p.text === "string") text += p.text;
     text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
@@ -7024,15 +7025,15 @@ async function deTrCall(env, model, texts) {
       const a = text.indexOf("["), b = text.lastIndexOf("]");
       if (a >= 0 && b > a) { try { arr = JSON.parse(text.slice(a, b + 1)); } catch (e2) {} }
     }
-    if (!Array.isArray(arr) || arr.length !== texts.length || arr.some(v => typeof v !== "string" || !v.trim())) return null;
-    return arr.map(v => v.trim());
-  } catch (e) { return null; } finally { clearTimeout(timer); }
+    if (!Array.isArray(arr) || arr.length !== texts.length || arr.some(v => typeof v !== "string" || !v.trim())) return { err: "bad array " + cand.finishReason };
+    return { out: arr.map(v => v.trim()) };
+  } catch (e) { return { err: "exception " + String(e && e.name || e) }; } finally { clearTimeout(timer); }
 }
 
 /* ترجمهٔ متن‌های تازه؛ نقشهٔ ترجمه یک روز در کش لبه می‌ماند */
 async function deTranslate(env, texts, map) {
   if (!env || !env.GEMINI_API_KEY) return false;
-  const todo = [...new Set(texts.filter(t => t && !map[deKey(t)]))].slice(0, 60);
+  const todo = [...new Set(texts.filter(t => t && !map[deKey(t)]))].slice(0, DE_TR_BATCH);
   if (!todo.length) return false;
   if (await edgeGet("deTrLock")) return false;
   await edgePut("deTrLock", "1", 90);
@@ -7041,14 +7042,19 @@ async function deTranslate(env, texts, map) {
   if (used >= DE_TR_DAILY_CAP) return false;
   await edgePut(capKey, String(used + 1), 90000);
   const models = await artTrModels(env);
+  if (!models.length) { await edgePut("deTrLast", JSON.stringify({ at: new Date().toISOString(), err: "no models" }), 86400); return false; }
+  let err = "";
   for (const model of models.slice(0, 2)) {
-    const out = await deTrCall(env, model, todo);
-    if (out) {
-      todo.forEach((t, i) => { map[deKey(t)] = out[i]; });
+    const res = await deTrCall(env, model, todo);
+    if (res.out) {
+      todo.forEach((t, i) => { map[deKey(t)] = res.out[i]; });
       await edgePut("deTrMap", JSON.stringify(map), 86400);
+      await edgePut("deTrLast", JSON.stringify({ at: new Date().toISOString(), ok: todo.length, model }), 86400);
       return true;
     }
+    err += model + ": " + res.err + "; ";
   }
+  await edgePut("deTrLast", JSON.stringify({ at: new Date().toISOString(), err }), 86400);
   return false;
 }
 
@@ -7079,7 +7085,8 @@ async function deBuild(env, ctx) {
   try { map = JSON.parse(await edgeGet("deTrMap") || "{}") || {}; } catch (e) { map = {}; }
 
   const texts = [];
-  for (const it of items) { texts.push(it.t); if (it.d) texts.push(it.d); }
+  for (const it of items) texts.push(it.t);
+  for (const it of items) if (it.d) texts.push(it.d);
   const missing = texts.some(t => !map[deKey(t)]);
   /* ترجمه پس‌زمینه انجام می‌شود تا صفحه منتظر نماند؛ تا آن موقع متن آلمانی نشان داده می‌شود */
   if (missing && ctx && ctx.waitUntil) ctx.waitUntil(deTranslate(env, texts, map));
@@ -7101,7 +7108,9 @@ async function handleDeNews(url, env, ctx) {
   const region = url.searchParams.get("r");
   const limit = Math.max(1, Math.min(60, parseInt(url.searchParams.get("limit") || "60", 10) || 60));
   const f = a => region && DE_REGION_FA[region] ? a.filter(x => x.r === region) : a;
-  const out = { ...data, trKey: !!(env && env.GEMINI_API_KEY), manual: f(data.manual).slice(0, limit), items: f(data.items).slice(0, limit) };
+  let trLast = null;
+  try { trLast = JSON.parse(await edgeGet("deTrLast") || "null"); } catch (e) {}
+  const out = { ...data, trKey: !!(env && env.GEMINI_API_KEY), trLast, manual: f(data.manual).slice(0, limit), items: f(data.items).slice(0, limit) };
   return new Response(JSON.stringify(out), { headers: { ...JSON_HEADERS, "Cache-Control": "public, max-age=120" } });
 }
 
